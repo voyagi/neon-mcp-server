@@ -17,15 +17,15 @@ Requirements for portfolio launch. Each maps to roadmap phases.
 
 - [x] **CUST-01**: `list_customers` tool returns all customers with optional filters by status (active/inactive/lead) and company name
 - [x] **CUST-02**: `get_customer` tool returns a single customer by UUID with all fields
-- [ ] **CUST-03**: `create_customer` tool adds a new customer with name, email, company, and status; returns created record
-- [ ] **CUST-04**: `update_customer` tool modifies customer fields by UUID; returns updated record
+- [x] **CUST-03**: `create_customer` tool adds a new customer with name, email, company, and status; returns created record
+- [x] **CUST-04**: `update_customer` tool modifies customer fields by UUID; returns updated record
 
 ### Tickets
 
 - [x] **TICK-01**: `list_tickets` tool returns tickets with optional filters by status (open/in_progress/closed), customer ID, and priority
 - [x] **TICK-02**: `get_ticket` tool returns ticket details including linked customer info via JOIN (not just customer_id)
-- [ ] **TICK-03**: `create_ticket` tool creates a support ticket linked to existing customer by UUID; validates customer exists
-- [ ] **TICK-04**: `close_ticket` tool marks ticket as resolved with closed_at timestamp; validates ticket is not already closed
+- [x] **TICK-03**: `create_ticket` tool creates a support ticket linked to existing customer by UUID; validates customer exists
+- [x] **TICK-04**: `close_ticket` tool marks ticket as resolved with closed_at timestamp; validates ticket is not already closed
 
 ### Products
 
@@ -34,7 +34,7 @@ Requirements for portfolio launch. Each maps to roadmap phases.
 
 ### Analytics
 
-- [ ] **ANLT-01**: `get_summary` tool returns composite dashboard stats: total customers by status, open vs closed ticket counts, total product catalog value
+- [x] **ANLT-01**: `get_summary` tool returns composite dashboard stats: total customers by status, open vs closed ticket counts, total product catalog value
 
 ### Seed Data
 
@@ -82,15 +82,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFR-03 | Phase 1 | Complete |
 | CUST-01 | Phase 2 | Complete |
 | CUST-02 | Phase 2 | Complete |
-| CUST-03 | Phase 3 | Pending |
-| CUST-04 | Phase 3 | Pending |
+| CUST-03 | Phase 3 | Complete |
+| CUST-04 | Phase 3 | Complete |
 | TICK-01 | Phase 2 | Complete |
 | TICK-02 | Phase 2 | Complete |
-| TICK-03 | Phase 3 | Pending |
-| TICK-04 | Phase 3 | Pending |
+| TICK-03 | Phase 3 | Complete |
+| TICK-04 | Phase 3 | Complete |
 | PROD-01 | Phase 2 | Complete |
 | PROD-02 | Phase 2 | Complete |
-| ANLT-01 | Phase 3 | Pending |
+| ANLT-01 | Phase 3 | Complete |
 | SEED-01 | Phase 4 | Pending |
 | SEED-02 | Phase 4 | Pending |
 | PLSH-01 | Phase 4 | Pending |
@@ -105,4 +105,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after Phase 2 execution complete*
+*Last updated: 2026-02-08 after Phase 3 execution complete*
