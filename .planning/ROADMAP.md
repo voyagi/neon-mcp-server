@@ -94,11 +94,12 @@ Plans:
   4. Claude Desktop config example is copy-paste ready with proper environment variable structure
   5. Demo conversation script covers all tool types: list, filter, create, close, search, analytics, and schema introspection
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 
-- [ ] TBD during phase planning
+- [ ] 04-01-PLAN.md -- Expand seed.sql with 20+ customers, 30+ tickets, 10+ products with narrative threads
+- [ ] 04-02-PLAN.md -- Portfolio-grade README with feature list, architecture diagram, setup guide, demo conversation
 
 ## Progress
 
@@ -110,7 +111,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation & Infrastructure | 3/3 | Complete | 2026-02-08 |
 | 2. Read Operations | 2/2 | Complete | 2026-02-08 |
 | 3. Write Operations & Analytics | 3/3 | Complete | 2026-02-08 |
-| 4. Seed Data & Portfolio Polish | 0/TBD | Not started | - |
+| 4. Seed Data & Portfolio Polish | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-08*
