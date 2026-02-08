@@ -1,0 +1,26 @@
+{
+	"name": "upwork-mcp-server",
+	"version": "0.1.0",
+	"private": true,
+	"description": "MCP server connecting Supabase database to Claude — Upwork portfolio demo",
+	"type": "module",
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsx watch src/index.ts",
+		"start": "node dist/index.js",
+		"check": "biome check --write .",
+		"lint": "biome lint --write .",
+		"format": "biome format --write ."
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.12.1",
+		"@supabase/supabase-js": "^2.49.4",
+		"zod": "^3.24.4"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.0.0",
+		"@types/node": "^22.15.0",
+		"tsx": "^4.19.4",
+		"typescript": "^5.8.3"
+	}
+}
