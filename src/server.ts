@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerSchemaResource } from "./resources/schema.js";
+import { registerAnalyticsTools } from "./tools/analytics.js";
 import { registerCustomerTools } from "./tools/customers.js";
 import { registerProductTools } from "./tools/products.js";
 import { registerTicketTools } from "./tools/tickets.js";
@@ -18,7 +19,8 @@ export function createServer() {
 	registerTicketTools(server);
 	registerProductTools(server);
 
-	// Write operations will be registered in Phase 3
+	// Analytics
+	registerAnalyticsTools(server);
 
 	return server;
 }
