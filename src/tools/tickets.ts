@@ -190,4 +190,213 @@ export function registerTicketTools(server: McpServer): void {
 			};
 		},
 	);
+
+	// create_ticket tool
+	server.tool(
+		"create_ticket",
+		"Create a new support ticket. Provide customer_id or customer_name to link the ticket.",
+		{
+			customer_id: z.string().uuid().optional(),
+			customer_name: z.string().optional(),
+			subject: z.string().min(1),
+			description: z.string().optional(),
+			priority: TicketPriority.optional(),
+		},
+		async (args) => {
+			const { customer_id, customer_name, subject, description, priority } =
+				args;
+
+			// Validate that at least one customer identifier is provided
+			if (!customer_id && !customer_name) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: "Either customer_id or customer_name is required",
+						},
+					],
+				};
+			}
+
+			let finalCustomerId: string;
+
+			// If customer_id is provided directly, use it (takes precedence)
+			if (customer_id) {
+				finalCustomerId = customer_id;
+			} else {
+				// Resolve customer by name
+				const { data: matchingCustomers, error: customerError } = await supabase
+					.from("customers")
+					.select("id, name")
+					.ilike("name", `%${customer_name}%`);
+
+				if (customerError) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `Database error while resolving customer name: ${customerError.message}`,
+							},
+						],
+					};
+				}
+
+				if (!matchingCustomers || matchingCustomers.length === 0) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `No customer found matching "${customer_name}"`,
+							},
+						],
+					};
+				}
+
+				if (matchingCustomers.length > 1) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: JSON.stringify(
+									{
+										error: `Multiple customers match "${customer_name}". Please specify which one:`,
+										matches: matchingCustomers.map((c) => ({
+											id: c.id,
+											name: c.name,
+										})),
+									},
+									null,
+									2,
+								),
+							},
+						],
+					};
+				}
+
+				finalCustomerId = matchingCustomers[0].id;
+			}
+
+			// Validate that the customer exists
+			const { data: customerCheck, error: customerCheckError } = await supabase
+				.from("customers")
+				.select("id")
+				.eq("id", finalCustomerId)
+				.single();
+
+			if (customerCheckError || !customerCheck) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Customer not found: ${finalCustomerId}`,
+						},
+					],
+				};
+			}
+
+			// Insert the ticket
+			const { data, error } = await supabase
+				.from("tickets")
+				.insert({
+					customer_id: finalCustomerId,
+					subject,
+					description: description || null,
+					priority: priority || "medium",
+				})
+				.select();
+
+			if (error) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Database error: ${error.message}`,
+						},
+					],
+				};
+			}
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify(data[0], null, 2),
+					},
+				],
+			};
+		},
+	);
+
+	// close_ticket tool
+	server.tool(
+		"close_ticket",
+		"Close a support ticket and mark it as resolved with optional resolution note",
+		{
+			id: z.string().uuid("Ticket ID must be a valid UUID"),
+			resolution: z.string().optional(),
+		},
+		async (args) => {
+			const { id, resolution } = args;
+
+			// Fetch current ticket to check if already closed
+			const { data: existing, error: fetchError } = await supabase
+				.from("tickets")
+				.select("status, closed_at")
+				.eq("id", id)
+				.single();
+
+			if (fetchError || !existing) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Ticket not found: ${id}`,
+						},
+					],
+				};
+			}
+
+			if (existing.status === "closed") {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Ticket ${id} is already closed (closed on ${existing.closed_at})`,
+						},
+					],
+				};
+			}
+
+			// Update ticket to closed
+			const { data, error } = await supabase
+				.from("tickets")
+				.update({
+					status: "closed",
+					closed_at: new Date().toISOString(),
+					resolution: resolution || null,
+				})
+				.eq("id", id)
+				.select();
+
+			if (error) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Database error: ${error.message}`,
+						},
+					],
+				};
+			}
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify(data[0], null, 2),
+					},
+				],
+			};
+		},
+	);
 }
