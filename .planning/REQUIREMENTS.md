@@ -15,22 +15,22 @@ Requirements for portfolio launch. Each maps to roadmap phases.
 
 ### Customers
 
-- [ ] **CUST-01**: `list_customers` tool returns all customers with optional filters by status (active/inactive/lead) and company name
-- [ ] **CUST-02**: `get_customer` tool returns a single customer by UUID with all fields
+- [x] **CUST-01**: `list_customers` tool returns all customers with optional filters by status (active/inactive/lead) and company name
+- [x] **CUST-02**: `get_customer` tool returns a single customer by UUID with all fields
 - [ ] **CUST-03**: `create_customer` tool adds a new customer with name, email, company, and status; returns created record
 - [ ] **CUST-04**: `update_customer` tool modifies customer fields by UUID; returns updated record
 
 ### Tickets
 
-- [ ] **TICK-01**: `list_tickets` tool returns tickets with optional filters by status (open/in_progress/closed), customer ID, and priority
-- [ ] **TICK-02**: `get_ticket` tool returns ticket details including linked customer info via JOIN (not just customer_id)
+- [x] **TICK-01**: `list_tickets` tool returns tickets with optional filters by status (open/in_progress/closed), customer ID, and priority
+- [x] **TICK-02**: `get_ticket` tool returns ticket details including linked customer info via JOIN (not just customer_id)
 - [ ] **TICK-03**: `create_ticket` tool creates a support ticket linked to existing customer by UUID; validates customer exists
 - [ ] **TICK-04**: `close_ticket` tool marks ticket as resolved with closed_at timestamp; validates ticket is not already closed
 
 ### Products
 
-- [ ] **PROD-01**: `list_products` tool returns all products with name, category, price, and description
-- [ ] **PROD-02**: `search_products` tool finds products by name or category using case-insensitive matching
+- [x] **PROD-01**: `list_products` tool returns all products with name, category, price, and description
+- [x] **PROD-02**: `search_products` tool finds products by name or category using case-insensitive matching
 
 ### Analytics
 
@@ -80,16 +80,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFR-01 | Phase 1 | Complete |
 | INFR-02 | Phase 1 | Complete |
 | INFR-03 | Phase 1 | Complete |
-| CUST-01 | Phase 2 | Pending |
-| CUST-02 | Phase 2 | Pending |
+| CUST-01 | Phase 2 | Complete |
+| CUST-02 | Phase 2 | Complete |
 | CUST-03 | Phase 3 | Pending |
 | CUST-04 | Phase 3 | Pending |
-| TICK-01 | Phase 2 | Pending |
-| TICK-02 | Phase 2 | Pending |
+| TICK-01 | Phase 2 | Complete |
+| TICK-02 | Phase 2 | Complete |
 | TICK-03 | Phase 3 | Pending |
 | TICK-04 | Phase 3 | Pending |
-| PROD-01 | Phase 2 | Pending |
-| PROD-02 | Phase 2 | Pending |
+| PROD-01 | Phase 2 | Complete |
+| PROD-02 | Phase 2 | Complete |
 | ANLT-01 | Phase 3 | Pending |
 | SEED-01 | Phase 4 | Pending |
 | SEED-02 | Phase 4 | Pending |
@@ -105,4 +105,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after roadmap creation with phase mappings*
+*Last updated: 2026-02-08 after Phase 2 execution complete*
