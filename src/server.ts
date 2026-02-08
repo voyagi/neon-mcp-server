@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerSchemaResource } from "./resources/schema.js";
+import { registerCustomerTools } from "./tools/customers.js";
+import { registerProductTools } from "./tools/products.js";
 
 export function createServer() {
 	const server = new McpServer({
@@ -10,7 +12,9 @@ export function createServer() {
 	// Resources
 	registerSchemaResource(server);
 
-	// Tools will be registered in Phase 2 (read) and Phase 3 (write)
+	// Tools — Read operations
+	registerCustomerTools(server);
+	registerProductTools(server);
 
 	return server;
 }
