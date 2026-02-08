@@ -73,11 +73,13 @@ Plans:
   4. User can close tickets and the system sets closed_at timestamp while preventing duplicate closures
   5. User can ask "show me a summary" and receive composite stats: customer counts by status, open vs closed tickets, total product catalog value
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 
-- [ ] TBD during phase planning
+- [ ] 03-01-PLAN.md -- Customer write tools (create_customer, update_customer)
+- [ ] 03-02-PLAN.md -- Ticket write tools (create_ticket, close_ticket) + resolution schema migration
+- [ ] 03-03-PLAN.md -- Analytics dashboard tool (get_summary)
 
 ### Phase 4: Seed Data & Portfolio Polish
 
@@ -107,7 +109,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation & Infrastructure | 3/3 | Complete | 2026-02-08 |
 | 2. Read Operations | 2/2 | Complete | 2026-02-08 |
-| 3. Write Operations & Analytics | 0/TBD | Not started | - |
+| 3. Write Operations & Analytics | 0/3 | Planned | - |
 | 4. Seed Data & Portfolio Polish | 0/TBD | Not started | - |
 
 ---
