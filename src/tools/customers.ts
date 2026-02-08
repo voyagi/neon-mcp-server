@@ -147,4 +147,61 @@ export function registerCustomerTools(server: McpServer): void {
 			};
 		},
 	);
+
+	// create_customer tool
+	server.tool(
+		"create_customer",
+		"Create a new customer with name, email, optional company and status",
+		{
+			name: z.string().min(1, "Customer name is required"),
+			email: z.string().email("Invalid email format"),
+			company: z.string().optional(),
+			status: CustomerStatus.optional(),
+		},
+		async (args) => {
+			const { name, email, company, status } = args;
+
+			const { data, error } = await supabase
+				.from("customers")
+				.insert({
+					name,
+					email,
+					company: company || null,
+					status: status || "active",
+				})
+				.select();
+
+			if (error) {
+				// Handle duplicate email constraint violation
+				if (error.code === "23505") {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `A customer with email "${email}" already exists`,
+							},
+						],
+					};
+				}
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Database error: ${error.message}`,
+						},
+					],
+				};
+			}
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify(data[0], null, 2),
+					},
+				],
+			};
+		},
+	);
 }
