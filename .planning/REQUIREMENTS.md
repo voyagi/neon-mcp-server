@@ -77,32 +77,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFR-01 | TBD | Pending |
-| INFR-02 | TBD | Pending |
-| INFR-03 | TBD | Pending |
-| CUST-01 | TBD | Pending |
-| CUST-02 | TBD | Pending |
-| CUST-03 | TBD | Pending |
-| CUST-04 | TBD | Pending |
-| TICK-01 | TBD | Pending |
-| TICK-02 | TBD | Pending |
-| TICK-03 | TBD | Pending |
-| TICK-04 | TBD | Pending |
-| PROD-01 | TBD | Pending |
-| PROD-02 | TBD | Pending |
-| ANLT-01 | TBD | Pending |
-| SEED-01 | TBD | Pending |
-| SEED-02 | TBD | Pending |
-| PLSH-01 | TBD | Pending |
-| PLSH-02 | TBD | Pending |
-| PLSH-03 | TBD | Pending |
+| INFR-01 | Phase 1 | Pending |
+| INFR-02 | Phase 1 | Pending |
+| INFR-03 | Phase 1 | Pending |
+| CUST-01 | Phase 2 | Pending |
+| CUST-02 | Phase 2 | Pending |
+| CUST-03 | Phase 3 | Pending |
+| CUST-04 | Phase 3 | Pending |
+| TICK-01 | Phase 2 | Pending |
+| TICK-02 | Phase 2 | Pending |
+| TICK-03 | Phase 3 | Pending |
+| TICK-04 | Phase 3 | Pending |
+| PROD-01 | Phase 2 | Pending |
+| PROD-02 | Phase 2 | Pending |
+| ANLT-01 | Phase 3 | Pending |
+| SEED-01 | Phase 4 | Pending |
+| SEED-02 | Phase 4 | Pending |
+| PLSH-01 | Phase 4 | Pending |
+| PLSH-02 | Phase 4 | Pending |
+| PLSH-03 | Phase 4 | Pending |
 
 **Coverage:**
 
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 (pending roadmap creation)
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after initial definition*
+*Last updated: 2026-02-08 after roadmap creation with phase mappings*
