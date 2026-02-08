@@ -204,4 +204,89 @@ export function registerCustomerTools(server: McpServer): void {
 			};
 		},
 	);
+
+	// update_customer tool
+	server.tool(
+		"update_customer",
+		"Update customer fields by ID. Only send the fields you want to change.",
+		{
+			id: z.string().uuid("Customer ID must be a valid UUID"),
+			name: z.string().optional(),
+			email: z.string().email("Invalid email format").optional(),
+			company: z.string().optional(),
+			status: CustomerStatus.optional(),
+		},
+		async (args) => {
+			const { id, name, email, company, status } = args;
+
+			// Build partial update object - only include fields that are not undefined
+			const updates: Record<string, unknown> = {};
+			if (name !== undefined) updates.name = name;
+			if (email !== undefined) updates.email = email;
+			if (company !== undefined) updates.company = company;
+			if (status !== undefined) updates.status = status;
+
+			// Validate that at least one field is provided
+			if (Object.keys(updates).length === 0) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: "No fields provided to update",
+						},
+					],
+				};
+			}
+
+			const { data, error } = await supabase
+				.from("customers")
+				.update(updates)
+				.eq("id", id)
+				.select();
+
+			if (error) {
+				// Handle duplicate email constraint violation
+				if (error.code === "23505") {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `Email "${email}" is already taken by another customer`,
+							},
+						],
+					};
+				}
+
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Database error: ${error.message}`,
+						},
+					],
+				};
+			}
+
+			// Check if customer was found
+			if (!data || data.length === 0) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Customer not found: ${id}`,
+						},
+					],
+				};
+			}
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify(data[0], null, 2),
+					},
+				],
+			};
+		},
+	);
 }
