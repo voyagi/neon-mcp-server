@@ -12,7 +12,7 @@ Transform a scaffolded MCP server project into a portfolio-ready demonstration o
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation & Infrastructure** - Logging, validation patterns, schema resource
+- [x] **Phase 1: Foundation & Infrastructure** - Logging, validation patterns, schema resource
 - [ ] **Phase 2: Read Operations** - Customer, ticket, product list/get tools with filtering
 - [ ] **Phase 3: Write Operations & Analytics** - Create/update/close tools plus dashboard summary
 - [ ] **Phase 4: Seed Data & Portfolio Polish** - Realistic demo data, setup guides, integration config
@@ -32,9 +32,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 
-- [ ] 01-01-PLAN.md -- Supabase client hardening (env validation, connection test, stderr logging audit)
-- [ ] 01-02-PLAN.md -- Zod validation schemas for all tool inputs + error formatter
-- [ ] 01-03-PLAN.md -- Schema resource (schema://tables) with full table metadata
+- [x] 01-01-PLAN.md -- Supabase client hardening (env validation, connection test, stderr logging audit)
+- [x] 01-02-PLAN.md -- Zod validation schemas for all tool inputs + error formatter
+- [x] 01-03-PLAN.md -- Schema resource (schema://tables) with full table metadata
 
 ### Phase 2: Read Operations
 **Goal**: Claude can query all business entities with natural filtering
@@ -88,11 +88,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Infrastructure | 0/3 | Planned | - |
+| 1. Foundation & Infrastructure | 3/3 | Complete | 2026-02-08 |
 | 2. Read Operations | 0/TBD | Not started | - |
 | 3. Write Operations & Analytics | 0/TBD | Not started | - |
 | 4. Seed Data & Portfolio Polish | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-08*
-*Last updated: 2026-02-08 after Phase 1 planning*
+*Last updated: 2026-02-08 after Phase 1 execution complete*

@@ -9,9 +9,9 @@ Requirements for portfolio launch. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFR-01**: MCP server exposes database schema as resource at `schema://tables` listing all tables and columns
-- [ ] **INFR-02**: All tool inputs validated with Zod schemas; invalid inputs return helpful error messages explaining what's wrong and how to fix it
-- [ ] **INFR-03**: All logging uses stderr only; no stdout writes that could corrupt the MCP JSON-RPC protocol stream
+- [x] **INFR-01**: MCP server exposes database schema as resource at `schema://tables` listing all tables and columns
+- [x] **INFR-02**: All tool inputs validated with Zod schemas; invalid inputs return helpful error messages explaining what's wrong and how to fix it
+- [x] **INFR-03**: All logging uses stderr only; no stdout writes that could corrupt the MCP JSON-RPC protocol stream
 
 ### Customers
 
@@ -77,9 +77,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFR-01 | Phase 1 | Pending |
-| INFR-02 | Phase 1 | Pending |
-| INFR-03 | Phase 1 | Pending |
+| INFR-01 | Phase 1 | Complete |
+| INFR-02 | Phase 1 | Complete |
+| INFR-03 | Phase 1 | Complete |
 | CUST-01 | Phase 2 | Pending |
 | CUST-02 | Phase 2 | Pending |
 | CUST-03 | Phase 3 | Pending |
