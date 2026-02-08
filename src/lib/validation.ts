@@ -70,6 +70,7 @@ export const UpdateCustomerSchema = z
 export const ListTicketsSchema = z.object({
 	status: TicketStatus.optional(),
 	customer_id: z.string().uuid("Customer ID must be a valid UUID").optional(),
+	customer_name: z.string().optional(),
 	priority: TicketPriority.optional(),
 });
 
