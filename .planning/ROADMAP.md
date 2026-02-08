@@ -28,10 +28,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Tools with invalid inputs return helpful error messages explaining exactly what's wrong and how to fix it
   3. Server logs diagnostic information to stderr without corrupting the MCP protocol stream on stdout
   4. Supabase client connects successfully and queries execute without connection pool issues
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD during phase planning
+
+- [ ] 01-01-PLAN.md -- Supabase client hardening (env validation, connection test, stderr logging audit)
+- [ ] 01-02-PLAN.md -- Zod validation schemas for all tool inputs + error formatter
+- [ ] 01-03-PLAN.md -- Schema resource (schema://tables) with full table metadata
 
 ### Phase 2: Read Operations
 **Goal**: Claude can query all business entities with natural filtering
@@ -85,11 +88,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Infrastructure | 0/TBD | Not started | - |
+| 1. Foundation & Infrastructure | 0/3 | Planned | - |
 | 2. Read Operations | 0/TBD | Not started | - |
 | 3. Write Operations & Analytics | 0/TBD | Not started | - |
 | 4. Seed Data & Portfolio Polish | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-08*
-*Last updated: 2026-02-08 after roadmap creation*
+*Last updated: 2026-02-08 after Phase 1 planning*
