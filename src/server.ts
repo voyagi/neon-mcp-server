@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerSchemaResource } from "./resources/schema.js";
 
 export function createServer() {
 	const server = new McpServer({
@@ -6,13 +7,10 @@ export function createServer() {
 		version: "0.1.0",
 	});
 
-	// Tools and resources will be registered here during development.
-	// See CLAUDE.md for the full list of tools to implement:
-	// - customers: list, get, create, update
-	// - tickets: list, get, create, close
-	// - products: list, search
-	// - analytics: get_summary
-	// - resources: schema://tables
+	// Resources
+	registerSchemaResource(server);
+
+	// Tools will be registered in Phase 2 (read) and Phase 3 (write)
 
 	return server;
 }
