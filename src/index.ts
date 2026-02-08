@@ -1,8 +1,10 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { validateConnection } from "./lib/supabase.js";
 import { createServer } from "./server.js";
 
 async function main() {
 	const server = createServer();
+	await validateConnection();
 	const transport = new StdioServerTransport();
 	await server.connect(transport);
 	console.error("TechStart CRM MCP server running on stdio");
