@@ -25,4 +25,5 @@ export interface Ticket {
 	priority: "low" | "medium" | "high" | "urgent";
 	created_at: string;
 	closed_at: string | null;
+	resolution: string | null;
 }

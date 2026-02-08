@@ -218,6 +218,14 @@ function buildSchema(): DatabaseSchema {
 						description:
 							"When the ticket was closed/resolved (null if still open)",
 					},
+					{
+						name: "resolution",
+						type: "text",
+						nullable: true,
+						default: null,
+						description:
+							"Resolution note explaining how the ticket was resolved (set when closing)",
+					},
 				],
 				constraints: [
 					{ type: "PRIMARY KEY", columns: ["id"] },

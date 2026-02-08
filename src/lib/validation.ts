@@ -80,7 +80,8 @@ export const GetTicketSchema = z.object({
 
 export const CreateTicketSchema = z
 	.object({
-		customer_id: z.string().uuid("Customer ID must be a valid UUID"),
+		customer_id: z.string().uuid("Customer ID must be a valid UUID").optional(),
+		customer_name: z.string().optional(),
 		subject: z.string().min(1, "Ticket subject is required"),
 		description: z.string().optional(),
 		priority: TicketPriority.optional(),
@@ -89,6 +90,7 @@ export const CreateTicketSchema = z
 
 export const CloseTicketSchema = z.object({
 	id: z.string().uuid("Ticket ID must be a valid UUID"),
+	resolution: z.string().optional(),
 });
 
 // Product tool schemas

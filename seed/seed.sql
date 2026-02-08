@@ -1,6 +1,9 @@
 -- TechStart CRM Demo Data
 -- Run this in Supabase SQL editor after creating the tables from CLAUDE.md
 
+-- Add resolution column for close_ticket notes (Phase 3)
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolution text;
+
 -- Customers
 INSERT INTO customers (name, email, company, status) VALUES
   ('Alice Johnson', 'alice@acmecorp.com', 'Acme Corp', 'active'),
