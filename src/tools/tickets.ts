@@ -1,5 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { findCustomersByName } from "../lib/customers.js";
+import {
+	dbErrorResponse,
+	jsonResponse,
+	notFoundResponse,
+	textResponse,
+} from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
 import { TicketPriority, TicketStatus } from "../lib/validation.js";
 
@@ -20,50 +27,28 @@ export function registerTicketTools(server: McpServer): void {
 		async (args) => {
 			const { status, customer_id, customer_name, priority } = args;
 
-			// Customer name resolution (two-step query)
 			let resolvedCustomerIds: string[] | null = null;
 
-			// Only resolve customer_name if customer_id is NOT provided
 			if (customer_name && !customer_id) {
-				const { data: matchingCustomers, error: customerError } = await supabase
-					.from("customers")
-					.select("id")
-					.ilike("name", `%${customer_name}%`);
+				const result = await findCustomersByName(customer_name);
 
-				if (customerError) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: `Database error while resolving customer name: ${customerError.message}`,
-							},
-						],
-					};
+				if (result.error) {
+					return textResponse(
+						`Database error while resolving customer name: ${result.error}`,
+					);
 				}
 
-				if (!matchingCustomers || matchingCustomers.length === 0) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: JSON.stringify(
-									{
-										results: [],
-										count: 0,
-										message: `No customers match the name "${customer_name}"`,
-									},
-									null,
-									2,
-								),
-							},
-						],
-					};
+				if (!result.data || result.data.length === 0) {
+					return jsonResponse({
+						results: [],
+						count: 0,
+						message: `No customers match the name "${customer_name}"`,
+					});
 				}
 
-				resolvedCustomerIds = matchingCustomers.map((c) => c.id);
+				resolvedCustomerIds = result.data.map((c) => c.id);
 			}
 
-			// Build main query with conditional filters
 			let query = supabase
 				.from("tickets")
 				.select("*, customers(name)")
@@ -74,10 +59,8 @@ export function registerTicketTools(server: McpServer): void {
 			}
 
 			if (customer_id) {
-				// customer_id takes precedence
 				query = query.eq("customer_id", customer_id);
 			} else if (resolvedCustomerIds) {
-				// Use resolved customer IDs from name search
 				query = query.in("customer_id", resolvedCustomerIds);
 			}
 
@@ -88,17 +71,9 @@ export function registerTicketTools(server: McpServer): void {
 			const { data, error } = await query;
 
 			if (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
-			// Flatten customers.name to customer_name
 			const results = (data || []).map((ticket) => ({
 				...ticket,
 				customer_name: ticket.customers?.name || "Unknown Customer",
@@ -118,14 +93,7 @@ export function registerTicketTools(server: McpServer): void {
 				response.message = "No tickets match your filters";
 			}
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(response, null, 2),
-					},
-				],
-			};
+			return jsonResponse(response);
 		},
 	);
 
@@ -156,17 +124,9 @@ export function registerTicketTools(server: McpServer): void {
 				.single();
 
 			if (error || !data) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Ticket not found: ${id}`,
-						},
-					],
-				};
+				return notFoundResponse("Ticket", id);
 			}
 
-			// Flatten customers nested object to customer (singular)
 			const response = {
 				...data,
 				customer: data.customers
@@ -180,14 +140,7 @@ export function registerTicketTools(server: McpServer): void {
 				customers: undefined,
 			};
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(response, null, 2),
-					},
-				],
-			};
+			return jsonResponse(response);
 		},
 	);
 
@@ -206,74 +159,38 @@ export function registerTicketTools(server: McpServer): void {
 			const { customer_id, customer_name, subject, description, priority } =
 				args;
 
-			// Validate that at least one customer identifier is provided
 			if (!customer_id && !customer_name) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: "Either customer_id or customer_name is required",
-						},
-					],
-				};
+				return textResponse("Either customer_id or customer_name is required");
 			}
 
 			let finalCustomerId: string;
 
-			// If customer_id is provided directly, use it (takes precedence)
 			if (customer_id) {
 				finalCustomerId = customer_id;
 			} else {
-				// Resolve customer by name
-				const { data: matchingCustomers, error: customerError } = await supabase
-					.from("customers")
-					.select("id, name")
-					.ilike("name", `%${customer_name}%`);
+				const result = await findCustomersByName(customer_name as string);
 
-				if (customerError) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: `Database error while resolving customer name: ${customerError.message}`,
-							},
-						],
-					};
+				if (result.error) {
+					return textResponse(
+						`Database error while resolving customer name: ${result.error}`,
+					);
 				}
 
-				if (!matchingCustomers || matchingCustomers.length === 0) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: `No customer found matching "${customer_name}"`,
-							},
-						],
-					};
+				if (!result.data || result.data.length === 0) {
+					return textResponse(`No customer found matching "${customer_name}"`);
 				}
 
-				if (matchingCustomers.length > 1) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: JSON.stringify(
-									{
-										error: `Multiple customers match "${customer_name}". Please specify which one:`,
-										matches: matchingCustomers.map((c) => ({
-											id: c.id,
-											name: c.name,
-										})),
-									},
-									null,
-									2,
-								),
-							},
-						],
-					};
+				if (result.data.length > 1) {
+					return jsonResponse({
+						error: `Multiple customers match "${customer_name}". Please specify which one:`,
+						matches: result.data.map((c) => ({
+							id: c.id,
+							name: c.name,
+						})),
+					});
 				}
 
-				finalCustomerId = matchingCustomers[0].id;
+				finalCustomerId = result.data[0].id;
 			}
 
 			// Validate that the customer exists
@@ -284,17 +201,9 @@ export function registerTicketTools(server: McpServer): void {
 				.single();
 
 			if (customerCheckError || !customerCheck) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Customer not found: ${finalCustomerId}`,
-						},
-					],
-				};
+				return notFoundResponse("Customer", finalCustomerId);
 			}
 
-			// Insert the ticket
 			const { data, error } = await supabase
 				.from("tickets")
 				.insert({
@@ -306,24 +215,10 @@ export function registerTicketTools(server: McpServer): void {
 				.select();
 
 			if (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(data[0], null, 2),
-					},
-				],
-			};
+			return jsonResponse(data[0]);
 		},
 	);
 
@@ -338,7 +233,6 @@ export function registerTicketTools(server: McpServer): void {
 		async (args) => {
 			const { id, resolution } = args;
 
-			// Fetch current ticket to check if already closed
 			const { data: existing, error: fetchError } = await supabase
 				.from("tickets")
 				.select("status, closed_at")
@@ -346,28 +240,15 @@ export function registerTicketTools(server: McpServer): void {
 				.single();
 
 			if (fetchError || !existing) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Ticket not found: ${id}`,
-						},
-					],
-				};
+				return notFoundResponse("Ticket", id);
 			}
 
 			if (existing.status === "closed") {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Ticket ${id} is already closed (closed on ${existing.closed_at})`,
-						},
-					],
-				};
+				return textResponse(
+					`Ticket ${id} is already closed (closed on ${existing.closed_at})`,
+				);
 			}
 
-			// Update ticket to closed
 			const { data, error } = await supabase
 				.from("tickets")
 				.update({
@@ -379,24 +260,10 @@ export function registerTicketTools(server: McpServer): void {
 				.select();
 
 			if (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(data[0], null, 2),
-					},
-				],
-			};
+			return jsonResponse(data[0]);
 		},
 	);
 }

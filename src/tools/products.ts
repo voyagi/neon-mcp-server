@@ -1,8 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { formatPrice } from "../lib/formatters.js";
+import { dbErrorResponse, jsonResponse } from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
 
-// Helper function to format product with price display
 function formatProduct(product: {
 	id: string;
 	name: string;
@@ -13,7 +14,7 @@ function formatProduct(product: {
 }) {
 	return {
 		...product,
-		price_display: `$${(product.price_cents / 100).toFixed(2)}`,
+		price_display: formatPrice(product.price_cents),
 	};
 }
 
@@ -30,30 +31,15 @@ export function registerProductTools(server: McpServer): void {
 				.order("name", { ascending: true });
 
 			if (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
 			const products = (data || []).map(formatProduct);
-			const response = {
+
+			return jsonResponse({
 				results: products,
 				count: products.length,
-			};
-
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(response, null, 2),
-					},
-				],
-			};
+			});
 		},
 	);
 
@@ -76,14 +62,7 @@ export function registerProductTools(server: McpServer): void {
 				.order("name", { ascending: true });
 
 			if (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
 			const products = (data || []).map(formatProduct);
@@ -100,14 +79,7 @@ export function registerProductTools(server: McpServer): void {
 				response.message = `No products match "${query}"`;
 			}
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(response, null, 2),
-					},
-				],
-			};
+			return jsonResponse(response);
 		},
 	);
 }

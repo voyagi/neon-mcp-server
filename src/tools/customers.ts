@@ -1,5 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import {
+	dbErrorResponse,
+	jsonResponse,
+	notFoundResponse,
+	textResponse,
+} from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
 import { CustomerStatus } from "../lib/validation.js";
 
@@ -15,7 +21,6 @@ export function registerCustomerTools(server: McpServer): void {
 		async (args) => {
 			const { status, company } = args;
 
-			// Build query with conditional filters
 			let query = supabase
 				.from("customers")
 				.select("*")
@@ -32,14 +37,7 @@ export function registerCustomerTools(server: McpServer): void {
 			const { data, error } = await query;
 
 			if (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
 			const results = data || [];
@@ -56,14 +54,7 @@ export function registerCustomerTools(server: McpServer): void {
 				response.message = "No customers match your filters";
 			}
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(response, null, 2),
-					},
-				],
-			};
+			return jsonResponse(response);
 		},
 	);
 
@@ -77,7 +68,6 @@ export function registerCustomerTools(server: McpServer): void {
 		async (args) => {
 			const { id } = args;
 
-			// Query 1: Get customer
 			const { data: customer, error: customerError } = await supabase
 				.from("customers")
 				.select("*")
@@ -85,30 +75,20 @@ export function registerCustomerTools(server: McpServer): void {
 				.single();
 
 			if (customerError || !customer) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Customer not found: ${id}`,
-						},
-					],
-				};
+				return notFoundResponse("Customer", id);
 			}
 
-			// Query 2: Get total ticket count
 			const { count: totalCount, error: totalError } = await supabase
 				.from("tickets")
 				.select("id", { count: "exact", head: true })
 				.eq("customer_id", id);
 
-			// Query 3: Get open ticket count
 			const { count: openCount, error: openError } = await supabase
 				.from("tickets")
 				.select("id", { count: "exact", head: true })
 				.eq("customer_id", id)
 				.neq("status", "closed");
 
-			// Query 4: Get recent tickets
 			const { data: recentTickets, error: recentError } = await supabase
 				.from("tickets")
 				.select("subject, status, created_at")
@@ -116,35 +96,20 @@ export function registerCustomerTools(server: McpServer): void {
 				.order("created_at", { ascending: false })
 				.limit(3);
 
-			// Handle any query errors
 			if (totalError || openError || recentError) {
 				const errorMsg =
 					totalError?.message || openError?.message || recentError?.message;
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error while fetching ticket data: ${errorMsg}`,
-						},
-					],
-				};
+				return textResponse(
+					`Database error while fetching ticket data: ${errorMsg}`,
+				);
 			}
 
-			const response = {
+			return jsonResponse({
 				...customer,
 				open_tickets_count: openCount ?? 0,
 				total_tickets_count: totalCount ?? 0,
 				recent_tickets: recentTickets || [],
-			};
-
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(response, null, 2),
-					},
-				],
-			};
+			});
 		},
 	);
 
@@ -172,36 +137,15 @@ export function registerCustomerTools(server: McpServer): void {
 				.select();
 
 			if (error) {
-				// Handle duplicate email constraint violation
 				if (error.code === "23505") {
-					return {
-						content: [
-							{
-								type: "text",
-								text: `A customer with email "${email}" already exists`,
-							},
-						],
-					};
+					return textResponse(
+						`A customer with email "${email}" already exists`,
+					);
 				}
-
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(data[0], null, 2),
-					},
-				],
-			};
+			return jsonResponse(data[0]);
 		},
 	);
 
@@ -219,23 +163,14 @@ export function registerCustomerTools(server: McpServer): void {
 		async (args) => {
 			const { id, name, email, company, status } = args;
 
-			// Build partial update object - only include fields that are not undefined
 			const updates: Record<string, unknown> = {};
 			if (name !== undefined) updates.name = name;
 			if (email !== undefined) updates.email = email;
 			if (company !== undefined) updates.company = company;
 			if (status !== undefined) updates.status = status;
 
-			// Validate that at least one field is provided
 			if (Object.keys(updates).length === 0) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: "No fields provided to update",
-						},
-					],
-				};
+				return textResponse("No fields provided to update");
 			}
 
 			const { data, error } = await supabase
@@ -245,48 +180,19 @@ export function registerCustomerTools(server: McpServer): void {
 				.select();
 
 			if (error) {
-				// Handle duplicate email constraint violation
 				if (error.code === "23505") {
-					return {
-						content: [
-							{
-								type: "text",
-								text: `Email "${email}" is already taken by another customer`,
-							},
-						],
-					};
+					return textResponse(
+						`Email "${email}" is already taken by another customer`,
+					);
 				}
-
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Database error: ${error.message}`,
-						},
-					],
-				};
+				return dbErrorResponse(error);
 			}
 
-			// Check if customer was found
 			if (!data || data.length === 0) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Customer not found: ${id}`,
-						},
-					],
-				};
+				return notFoundResponse("Customer", id);
 			}
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(data[0], null, 2),
-					},
-				],
-			};
+			return jsonResponse(data[0]);
 		},
 	);
 }

@@ -1,10 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { formatPrice } from "../lib/formatters.js";
+import { jsonResponse, textResponse } from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
-
-// Helper function to format price
-function formatPrice(cents: number): string {
-	return `$${(cents / 100).toFixed(2)}`;
-}
 
 export function registerAnalyticsTools(server: McpServer): void {
 	// get_summary tool
@@ -13,13 +10,11 @@ export function registerAnalyticsTools(server: McpServer): void {
 		"Get a dashboard summary with customer counts, ticket stats, product catalog value, and recent activity",
 		{},
 		async () => {
-			// Calculate 7 days ago
 			const sevenDaysAgo = new Date(
 				Date.now() - 7 * 24 * 60 * 60 * 1000,
 			).toISOString();
 
 			try {
-				// Batch 1 - Customer counts by status
 				const [activeCustomers, inactiveCustomers, leadCustomers] =
 					await Promise.all([
 						supabase
@@ -36,7 +31,6 @@ export function registerAnalyticsTools(server: McpServer): void {
 							.eq("status", "lead"),
 					]);
 
-				// Batch 2 - Ticket counts
 				const [
 					openTickets,
 					closedTickets,
@@ -75,7 +69,6 @@ export function registerAnalyticsTools(server: McpServer): void {
 						.eq("priority", "low"),
 				]);
 
-				// Batch 3 - Products + Recent activity
 				const [productsResult, recentCustomers, recentClosedTickets] =
 					await Promise.all([
 						supabase.from("products").select("price_cents, category"),
@@ -90,7 +83,6 @@ export function registerAnalyticsTools(server: McpServer): void {
 							.gte("closed_at", sevenDaysAgo),
 					]);
 
-				// Extract counts
 				const active = activeCustomers.count ?? 0;
 				const inactive = inactiveCustomers.count ?? 0;
 				const leads = leadCustomers.count ?? 0;
@@ -106,7 +98,6 @@ export function registerAnalyticsTools(server: McpServer): void {
 				const customersCreatedThisWeek = recentCustomers.count ?? 0;
 				const ticketsClosedThisWeek = recentClosedTickets.count ?? 0;
 
-				// Product aggregation
 				let productValue = "Error loading product data";
 				let categoryBreakdown: { category: string; value: string }[] = [];
 
@@ -132,7 +123,7 @@ export function registerAnalyticsTools(server: McpServer): void {
 					);
 				}
 
-				const response = {
+				return jsonResponse({
 					customers: {
 						active,
 						inactive,
@@ -143,12 +134,7 @@ export function registerAnalyticsTools(server: McpServer): void {
 						open,
 						closed,
 						total: open + closed,
-						by_priority: {
-							urgent,
-							high,
-							medium,
-							low,
-						},
+						by_priority: { urgent, high, medium, low },
 					},
 					products: {
 						total_value: productValue,
@@ -158,25 +144,11 @@ export function registerAnalyticsTools(server: McpServer): void {
 						customers_created_this_week: customersCreatedThisWeek,
 						tickets_closed_this_week: ticketsClosedThisWeek,
 					},
-				};
-
-				return {
-					content: [
-						{
-							type: "text",
-							text: JSON.stringify(response, null, 2),
-						},
-					],
-				};
+				});
 			} catch (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Error fetching summary: ${error instanceof Error ? error.message : String(error)}`,
-						},
-					],
-				};
+				return textResponse(
+					`Error fetching summary: ${error instanceof Error ? error.message : String(error)}`,
+				);
 			}
 		},
 	);
