@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An MCP server that connects a Supabase Postgres database to Claude Desktop/Code, exposing a fictional small business CRM ("TechStart CRM") with customers, support tickets, and products. Claude can query and modify business data through natural language. This is portfolio piece #3 for an Upwork freelancing profile, demonstrating the ability to build custom MCP servers — the highest-value AI freelancing skill ($2K-15K per project).
+An MCP server that connects a Supabase Postgres database to Claude Desktop/Code, exposing a fictional small business CRM ("TechStart CRM") with customers, support tickets, and products. Claude can query, create, update, and analyze business data through natural language. 11 tools + 1 schema resource cover full CRUD operations, filtering, search, and analytics. This is portfolio piece #3 for an Upwork freelancing profile, demonstrating the ability to build custom MCP servers — the highest-value AI freelancing skill ($2K-15K per project).
 
 ## Core Value
 
@@ -12,26 +12,26 @@ Prospects who see this project should immediately think "he can build this for m
 
 ### Validated
 
-- ✓ MCP server entry point with stdio transport — existing
-- ✓ Server definition with tool/resource registration hooks — existing
-- ✓ Supabase client initialization from environment variables — existing
-- ✓ TypeScript domain types (Customer, Ticket, Product) — existing
-- ✓ Build/dev/lint/format toolchain (TypeScript, Biome, tsx) — existing
-- ✓ Project dependencies installed (MCP SDK, Supabase JS, Zod) — existing
+- ✓ MCP server entry point with stdio transport — v1.0
+- ✓ Server definition with tool/resource registration hooks — v1.0
+- ✓ Supabase client with env validation and connection testing — v1.0
+- ✓ TypeScript domain types (Customer, Ticket, Product) — v1.0
+- ✓ Build/dev/lint/format toolchain (TypeScript, Biome, tsx) — v1.0
+- ✓ Customer CRUD tools (list, get, create, update) — v1.0
+- ✓ Ticket CRUD tools (list, get, create, close) — v1.0
+- ✓ Product read tools (list, search) — v1.0
+- ✓ Analytics summary tool (customer counts, ticket stats, catalog value) — v1.0
+- ✓ Database schema MCP resource (schema://tables) — v1.0
+- ✓ Zod input validation on all tool parameters — v1.0
+- ✓ Seed SQL with realistic demo data (22 customers, 32 tickets, 12 products) — v1.0
+- ✓ Supabase setup guide (create project, run seed SQL) — v1.0
+- ✓ Portfolio README with demo conversation and setup guide — v1.0
+- ✓ Claude Desktop integration config example — v1.0
+- ✓ Demo conversation script covering all 7 tool types — v1.0
 
 ### Active
 
-- [ ] Customer CRUD tools (list, get, create, update)
-- [ ] Ticket CRUD tools (list, get, create, close)
-- [ ] Product read tools (list, search)
-- [ ] Analytics summary tool (total customers, open tickets, revenue)
-- [ ] Database schema MCP resource (schema://tables)
-- [ ] Zod input validation on all tool parameters
-- [ ] Seed SQL with very realistic demo data (~20 customers, ~30 tickets, ~10 products)
-- [ ] Supabase setup guide (create project, run seed SQL)
-- [ ] Polished README — video demo path + self-serve setup guide
-- [ ] Claude Desktop integration config example
-- [ ] Screen-recorded demo conversation showcasing tool variety
+(None — v1.0 shipped. Start `/gsd:new-milestone` for v1.1 requirements.)
 
 ### Out of Scope
 
@@ -40,34 +40,40 @@ Prospects who see this project should immediately think "he can build this for m
 - Deployment/hosting — runs locally via Claude Desktop stdio transport
 - Frontend/UI — the entire point is that Claude IS the interface
 - Testing framework — portfolio demo, not production software; time better spent on polish
+- DELETE operations — destructive in demos; use status changes (close, archive) instead
+- HTTP/SSE transport — stdio sufficient for Claude Desktop; simpler setup for prospects
+- Raw SQL execution tool — intent-focused tools only; raw SQL is an anti-pattern for MCP demos
+- Pagination — demo scale doesn't need it; deferred to v2 if prospects request
 
 ## Context
 
-- MCP is cutting-edge — most Upwork freelancers don't know it yet, making this a strong differentiator
-- Portfolio pieces #1 (AI chatbot) and #2 (n8n automation) prove breadth; this one proves depth
-- Scaffolding is complete: package.json, tsconfig, biome.json, entry point, server definition, types, Supabase client
-- Tools and resources are not yet implemented — the core work remains
-- Seed data should feel very realistic: diverse companies, multi-status tickets with history, realistic product pricing
-- README serves double duty: documentation AND sales page for the Upwork profile
-- Demo should showcase technical variety: CRUD operations, filtering, analytics, schema introspection
+Shipped v1.0 with 1,505 LOC TypeScript across 11 tools + 1 resource.
+Tech stack: Node.js, TypeScript, @modelcontextprotocol/sdk, Supabase (PostgreSQL), Zod, Biome.
+Demo dataset: 22 customers across 10+ industries, 32 tickets with narrative threads, 12 SaaS products.
+README serves as both documentation and Upwork portfolio sales page.
 
 ## Constraints
 
 - **Tech stack**: Node.js + TypeScript, @modelcontextprotocol/sdk, @supabase/supabase-js, Zod, Biome — all locked
 - **Transport**: stdio only (Claude Desktop/Code integration)
-- **Architecture**: Already scaffolded in src/ — follow existing structure
+- **Architecture**: src/ with tools/, resources/, lib/ structure
 - **Database**: Supabase Postgres with service role key (no RLS)
-- **Tool count**: ~11 tools + 1 resource as specified in CLAUDE.md
+- **Tool count**: 11 tools + 1 resource
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Supabase over raw Postgres | Easier setup for prospects trying the demo, free tier available | — Pending |
-| Service role key (no RLS) | Portfolio demo, not multi-tenant production; simpler setup | — Pending |
-| stdio transport only | Standard for Claude Desktop integration, no HTTP complexity | — Pending |
-| No test framework | Time investment better spent on polish and demo quality for portfolio purposes | — Pending |
-| Very realistic seed data | Demo conversations feel believable, not contrived | — Pending |
+| Supabase over raw Postgres | Easier setup for prospects trying the demo, free tier available | ✓ Good — prospects can follow setup in <15 min |
+| Service role key (no RLS) | Portfolio demo, not multi-tenant production; simpler setup | ✓ Good — no auth complexity for demo |
+| stdio transport only | Standard for Claude Desktop integration, no HTTP complexity | ✓ Good — copy-paste config works |
+| No test framework | Time investment better spent on polish and demo quality for portfolio purposes | ✓ Good — 298-line README with demo conversation |
+| Very realistic seed data | Demo conversations feel believable, not contrived | ✓ Good — narrative threads, 10+ industries |
+| Hardcoded schema resource | Runtime introspection unreliable; human-readable descriptions add value | ✓ Good — descriptions help Claude reason |
+| Zod .strict() with enum errorMaps | Validation errors show invalid value and valid options | ✓ Good — helpful error messages |
+| Read-before-write phase ordering | Validate data access patterns before allowing destructive operations | ✓ Good — caught JOIN patterns early |
+| Promise.all for analytics | Minimize latency for composite dashboard queries | ✓ Good — parallel execution |
+| Subquery FK resolution in seed SQL | Portable seed data, no hardcoded UUIDs | ✓ Good — works on any fresh Supabase project |
 
 ---
-*Last updated: 2026-02-08 after initialization*
+*Last updated: 2026-02-09 after v1.0 milestone*
