@@ -124,7 +124,7 @@ create table tickets (
 );
 ```
 
-Then run the contents of `seed/seed.sql` to populate the database with 22 customers, 12 products, and 35 support tickets.
+Then run the contents of `seed/seed.sql` to populate the database with 22 customers, 12 products, and 32 support tickets.
 
 ### 3. Configure environment
 
@@ -189,27 +189,38 @@ I have access to a CRM database with three tables: **customers** (name, email, c
 Here is your dashboard overview:
 
 - **Customers:** 22 total — 15 active, 4 inactive, 3 leads
-- **Tickets:** 35 total — 23 open (3 urgent, 5 high priority), 12 closed
-- **Products:** 12 items across 4 categories, total catalog value of $3,474.00
-- **This week:** 2 new customers signed up, 4 tickets resolved
+- **Tickets:** 32 total — 23 open (4 urgent, 7 high priority), 9 closed
+- **Products:** 12 items across 3 categories, total catalog value of $2,348.00
+- **This week:** 2 new customers signed up, 0 tickets resolved
 
-The 3 urgent tickets should be your first priority.
+The 4 urgent tickets should be your first priority.
 
 **User:** Show me the urgent tickets.
 
 **Claude:** *[Calls list_tickets with status: "open", priority: "urgent"]*
-There are 3 urgent open tickets:
+There are 4 urgent open tickets:
 
-1. **SSL certificate expiration warning** — Ironclad Security (David Kim), created 4 days ago
-2. **Payment processing timeout errors** — Summit Finance Group (Rachel Foster), created 2 days ago
-3. **Data export failing for large datasets** — QuantumLeap Analytics (Nadia Petrova), created 1 day ago
+1. **URGENT: data export blocking quarterly report** — Apex Manufacturing (Marcus Reed), created 1 day ago
+2. **SSL certificate renewal failing** — Ironclad Security (David Kim), created 2 days ago
+3. **Checkout integration dropping orders during peak hours** — Velvet Retail (Amira Hassan), created 2 days ago
+4. **Suspicious login attempts from unknown IPs** — Ironclad Security (David Kim), created 1 day ago
 
-The SSL certificate issue is the oldest — want me to look into any of these?
+The SSL certificate issue is customer-facing — want me to look into any of these?
 
 **User:** Close the SSL ticket. We renewed the certificate and updated the configuration.
 
 **Claude:** *[Calls close_ticket with resolution: "SSL certificate renewed and server configuration updated. Verified HTTPS connectivity restored."]*
-Done. The SSL certificate ticket for Ironclad Security has been closed with your resolution note. That brings your urgent count down to 2.
+Done. The SSL certificate ticket for Ironclad Security has been closed with your resolution note. That brings your urgent count down to 3.
+
+**User:** Before we onboard them — what integration options do we offer?
+
+**Claude:** *[Calls search_products with query: "integration"]*
+We have two integration-related products:
+
+1. **API Access** — $79.00/mo — REST and GraphQL API access, 10K requests/day, webhook integrations
+2. **Custom Integrations** — $149.00/mo — Custom API integrations with your existing tools (Salesforce, HubSpot, Jira, etc.)
+
+The API Access add-on covers standard integrations. If they need connections to specific internal systems, the Custom Integrations package includes hands-on setup.
 
 **User:** We just signed Pinnacle Retail as a new customer. Contact is Dana Park, dana@pinnacleretail.com.
 
@@ -222,10 +233,10 @@ Created. Dana Park from Pinnacle Retail has been added as an active customer. Wo
 Updated numbers after your changes:
 
 - **Customers:** 23 total — 16 active, 4 inactive, 3 leads (up from 22)
-- **Tickets:** 35 total — 22 open (2 urgent, 5 high), 13 closed
-- **This week:** 3 new customers, 5 tickets resolved
+- **Tickets:** 32 total — 22 open (3 urgent, 7 high), 10 closed
+- **This week:** 3 new customers, 1 ticket resolved
 
-One fewer urgent ticket and one more customer compared to a few minutes ago. The 2 remaining urgent tickets are the payment processing timeout and the data export failure.
+One fewer urgent ticket and one more customer compared to a few minutes ago. The 3 remaining urgent tickets are the data export blocking quarterly report (Marcus Reed), checkout integration dropping orders (Amira Hassan), and suspicious login attempts (David Kim).
 
 ---
 
