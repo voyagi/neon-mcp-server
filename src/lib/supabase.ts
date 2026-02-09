@@ -3,14 +3,14 @@ import { createClient } from "@supabase/supabase-js";
 // Validate required environment variables at module load
 if (!process.env.SUPABASE_URL) {
 	console.error(
-		"Missing required environment variable: SUPABASE_URL. See seed/setup.md for configuration instructions.",
+		"Missing required environment variable: SUPABASE_URL. See README.md for configuration instructions.",
 	);
 	process.exit(1);
 }
 
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
 	console.error(
-		"Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY. See seed/setup.md for configuration instructions.",
+		"Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY. See README.md for configuration instructions.",
 	);
 	process.exit(1);
 }
@@ -35,7 +35,7 @@ export async function validateConnection(): Promise<void> {
 		console.error("Supabase connection verified");
 	} catch {
 		console.error(
-			"Failed to connect to Supabase database. Verify SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are correct. If tables are missing, run the seed script — see seed/setup.md.",
+			"Failed to connect to Supabase database. Verify SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are correct. If tables are missing, run the seed script — see README.md.",
 		);
 		process.exit(1);
 	}
