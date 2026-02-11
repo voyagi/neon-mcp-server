@@ -8,15 +8,15 @@ if (!process.env.SUPABASE_URL) {
 	process.exit(1);
 }
 
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+if (!process.env.SUPABASE_SECRET_KEY) {
 	console.error(
-		"Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY. See README.md for configuration instructions.",
+		"Missing required environment variable: SUPABASE_SECRET_KEY. See README.md for configuration instructions.",
 	);
 	process.exit(1);
 }
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseKey = process.env.SUPABASE_SECRET_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -35,7 +35,7 @@ export async function validateConnection(): Promise<void> {
 		console.error("Supabase connection verified");
 	} catch {
 		console.error(
-			"Failed to connect to Supabase database. Verify SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are correct. If tables are missing, run the seed script — see README.md.",
+			"Failed to connect to Supabase database. Verify SUPABASE_URL and SUPABASE_SECRET_KEY are correct. If tables are missing, run the seed script — see README.md.",
 		);
 		process.exit(1);
 	}

@@ -144,7 +144,7 @@ create table tickets (
 Copy `.env.example` to `.env` and fill in:
 
 - `SUPABASE_URL` — Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` — Service role key (server-side, full access)
+- `SUPABASE_SECRET_KEY` — Service role key (server-side, full access)
 
 ## Claude Desktop Integration
 
@@ -158,7 +158,7 @@ Add to `claude_desktop_config.json`:
       "args": ["C:/Users/Eagi/upwork-mcp-server/dist/index.js"],
       "env": {
         "SUPABASE_URL": "https://your-project.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "eyJ..."
+        "SUPABASE_SECRET_KEY": "eyJ..."
       }
     }
   }
@@ -183,8 +183,12 @@ testing, or seeing a rendered page: use the dev-browser skill in
 - ALWAYS use extension mode (`npm run start-extension`) — connects to the
   user's Chrome, no separate window
 - NEVER install Playwright MCP or write raw Playwright scripts
-- Use `client.page()`, `client.getAISnapshot()`, `page.screenshot()`
-- If the skill isn't deployed yet, copy from `~/.claude/skill-library/dev-browser/`
+- Use `cdpScreenshot()` for screenshots (never `page.screenshot()`)
+- Use `getIframeContent()` / `evaluateInIframe()` for cross-origin iframes
+- If the skill isn't deployed yet, copy from
+  `/c/Users/Eagi/.claude/skill-library/dev-browser/`
+- **Never use `~` in bash paths** — MSYS expands to `/home/Eagi` not
+  `/c/Users/Eagi`
 
 ## Demo Strategy
 

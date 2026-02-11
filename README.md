@@ -132,10 +132,10 @@ Then run the contents of `seed/seed.sql` to populate the database with 22 custom
 cp .env.example .env
 ```
 
-Fill in your Supabase credentials from **Project Settings > API**:
+Fill in your Supabase credentials from the **Connect dialog** (or Project Settings > API Keys):
 
 - `SUPABASE_URL` — your project URL (e.g., `https://abcdefg.supabase.co`)
-- `SUPABASE_SERVICE_ROLE_KEY` — the service role key (not the anon key)
+- `SUPABASE_SECRET_KEY` — the service role key (not the anon key)
 
 ### 4. Build and run
 
@@ -163,7 +163,7 @@ Add the following to your Claude Desktop config file:
       "args": ["/absolute/path/to/upwork-mcp-server/dist/index.js"],
       "env": {
         "SUPABASE_URL": "https://your-project-id.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key-here"
+        "SUPABASE_SECRET_KEY": "your-service-role-key-here"
       }
     }
   }
