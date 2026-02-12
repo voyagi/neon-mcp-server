@@ -16,8 +16,8 @@ describe("CustomerStatus enum", () => {
 		const result = CustomerStatus.safeParse("deleted");
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.errors[0].message).toContain("deleted");
-			expect(result.error.errors[0].message).toContain("active");
+			expect(result.error.issues[0].message).toContain("deleted");
+			expect(result.error.issues[0].message).toContain("active");
 		}
 	});
 });
@@ -33,8 +33,8 @@ describe("TicketStatus enum", () => {
 		const result = TicketStatus.safeParse("pending");
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.errors[0].message).toContain("pending");
-			expect(result.error.errors[0].message).toContain("open");
+			expect(result.error.issues[0].message).toContain("pending");
+			expect(result.error.issues[0].message).toContain("open");
 		}
 	});
 });
@@ -51,8 +51,8 @@ describe("TicketPriority enum", () => {
 		const result = TicketPriority.safeParse("critical");
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.errors[0].message).toContain("critical");
-			expect(result.error.errors[0].message).toContain("low");
+			expect(result.error.issues[0].message).toContain("critical");
+			expect(result.error.issues[0].message).toContain("low");
 		}
 	});
 });

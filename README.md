@@ -291,7 +291,47 @@ npm run start    # Run compiled version
 npm run check    # Biome lint + format
 ```
 
----
+## Testing
+
+```bash
+npm test            # Run all tests once
+npm run test:watch  # Run tests in watch mode during development
+```
+
+The test suite covers:
+
+- **Server registration** - verifies all 11 tools and the schema resource are registered
+- **Schema resource** - validates the database schema JSON structure and relationships
+- **Customer tools** - CRUD operations, duplicate email handling, empty results
+- **Ticket tools** - creation with customer name resolution, closing, state validation
+- **Product tools** - listing with price formatting, search, empty results
+- **Analytics** - dashboard aggregation with parallel query batching
+- **Validation** - enum schemas with custom error messages
+- **Response helpers** - MCP response formatting utilities
+- **Formatters** - price and product display formatting
+
+All tool tests use `InMemoryTransport` for full MCP client/server integration testing with a mocked Supabase backend, so no database connection is needed.
+
+## Troubleshooting
+
+**"Missing required environment variable: SUPABASE_URL"**
+You haven't created the `.env` file. Copy `.env.example` to `.env` and fill in your Supabase credentials.
+
+**"Failed to connect to Supabase database"**
+The server starts but can't reach Supabase. Check that:
+
+- `SUPABASE_URL` is your full project URL (e.g., `https://abcdefg.supabase.co`)
+- `SUPABASE_SECRET_KEY` is the **service role** key, not the anon key
+- Your Supabase project is active (free-tier projects pause after inactivity)
+
+**"relation customers does not exist" or similar**
+The database tables haven't been created. Run the SQL schema from the Setup section in the Supabase SQL Editor, then run `seed/seed.sql` to populate demo data.
+
+**"permission denied for table customers"**
+You're using the anon key instead of the service role key. Go to Project Settings > API in your Supabase dashboard and copy the `service_role` key (not `anon`).
+
+**Server starts but Claude doesn't see the tools**
+Verify the path in `claude_desktop_config.json` points to the compiled `dist/index.js` (not `src/index.ts`). Run `npm run build` first if you haven't.
 
 ## License
 

@@ -1,22 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { formatPrice } from "../lib/formatters.js";
-import { dbErrorResponse, jsonResponse } from "../lib/responses.js";
+import { formatProduct } from "../lib/formatters.js";
+import { dbErrorResponse, listResponse } from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
-
-function formatProduct(product: {
-	id: string;
-	name: string;
-	category: string;
-	price_cents: number;
-	description: string | null;
-	created_at: string | null;
-}) {
-	return {
-		...product,
-		price_display: formatPrice(product.price_cents),
-	};
-}
 
 export function registerProductTools(server: McpServer): void {
 	// list_products tool
@@ -34,12 +20,7 @@ export function registerProductTools(server: McpServer): void {
 				return dbErrorResponse(error);
 			}
 
-			const products = (data || []).map(formatProduct);
-
-			return jsonResponse({
-				results: products,
-				count: products.length,
-			});
+			return listResponse((data || []).map(formatProduct));
 		},
 	);
 
@@ -48,7 +29,7 @@ export function registerProductTools(server: McpServer): void {
 		"search_products",
 		"Search products by name, category, or description",
 		{
-			query: z.string().min(1, "Search query is required"),
+			query: z.string().min(1, { error: "Search query is required" }),
 		},
 		async (args) => {
 			const { query } = args;
@@ -65,21 +46,10 @@ export function registerProductTools(server: McpServer): void {
 				return dbErrorResponse(error);
 			}
 
-			const products = (data || []).map(formatProduct);
-			const response: {
-				results: typeof products;
-				count: number;
-				message?: string;
-			} = {
-				results: products,
-				count: products.length,
-			};
-
-			if (products.length === 0) {
-				response.message = `No products match "${query}"`;
-			}
-
-			return jsonResponse(response);
+			return listResponse(
+				(data || []).map(formatProduct),
+				`No products match "${query}"`,
+			);
 		},
 	);
 }

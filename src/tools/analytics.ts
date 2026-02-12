@@ -3,6 +3,26 @@ import { formatPrice } from "../lib/formatters.js";
 import { jsonResponse, textResponse } from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
 
+type CountFilter = {
+	field: string;
+	op: "eq" | "neq" | "gte";
+	value: string;
+};
+
+async function countWhere(
+	table: string,
+	filters: CountFilter[],
+): Promise<number> {
+	let query = supabase.from(table).select("id", { count: "exact", head: true });
+	for (const { field, op, value } of filters) {
+		if (op === "eq") query = query.eq(field, value);
+		else if (op === "neq") query = query.neq(field, value);
+		else query = query.gte(field, value);
+	}
+	const { count } = await query;
+	return count ?? 0;
+}
+
 export function registerAnalyticsTools(server: McpServer): void {
 	// get_summary tool
 	server.tool(
@@ -15,88 +35,77 @@ export function registerAnalyticsTools(server: McpServer): void {
 			).toISOString();
 
 			try {
-				const [activeCustomers, inactiveCustomers, leadCustomers] =
-					await Promise.all([
-						supabase
-							.from("customers")
-							.select("id", { count: "exact", head: true })
-							.eq("status", "active"),
-						supabase
-							.from("customers")
-							.select("id", { count: "exact", head: true })
-							.eq("status", "inactive"),
-						supabase
-							.from("customers")
-							.select("id", { count: "exact", head: true })
-							.eq("status", "lead"),
-					]);
-
-				const [
-					openTickets,
-					closedTickets,
-					urgentTickets,
-					highTickets,
-					mediumTickets,
-					lowTickets,
-				] = await Promise.all([
-					supabase
-						.from("tickets")
-						.select("id", { count: "exact", head: true })
-						.neq("status", "closed"),
-					supabase
-						.from("tickets")
-						.select("id", { count: "exact", head: true })
-						.eq("status", "closed"),
-					supabase
-						.from("tickets")
-						.select("id", { count: "exact", head: true })
-						.neq("status", "closed")
-						.eq("priority", "urgent"),
-					supabase
-						.from("tickets")
-						.select("id", { count: "exact", head: true })
-						.neq("status", "closed")
-						.eq("priority", "high"),
-					supabase
-						.from("tickets")
-						.select("id", { count: "exact", head: true })
-						.neq("status", "closed")
-						.eq("priority", "medium"),
-					supabase
-						.from("tickets")
-						.select("id", { count: "exact", head: true })
-						.neq("status", "closed")
-						.eq("priority", "low"),
+				const [active, inactive, leads] = await Promise.all([
+					countWhere("customers", [
+						{ field: "status", op: "eq", value: "active" },
+					]),
+					countWhere("customers", [
+						{ field: "status", op: "eq", value: "inactive" },
+					]),
+					countWhere("customers", [
+						{ field: "status", op: "eq", value: "lead" },
+					]),
 				]);
 
-				const [productsResult, recentCustomers, recentClosedTickets] =
-					await Promise.all([
-						supabase.from("products").select("price_cents, category"),
-						supabase
-							.from("customers")
-							.select("id", { count: "exact", head: true })
-							.gte("created_at", sevenDaysAgo),
-						supabase
-							.from("tickets")
-							.select("id", { count: "exact", head: true })
-							.eq("status", "closed")
-							.gte("closed_at", sevenDaysAgo),
-					]);
+				const openFilter: CountFilter = {
+					field: "status",
+					op: "neq",
+					value: "closed",
+				};
 
-				const active = activeCustomers.count ?? 0;
-				const inactive = inactiveCustomers.count ?? 0;
-				const leads = leadCustomers.count ?? 0;
+				const [open, closed, urgent, high, medium, low] = await Promise.all([
+					countWhere("tickets", [openFilter]),
+					countWhere("tickets", [
+						{ field: "status", op: "eq", value: "closed" },
+					]),
+					countWhere("tickets", [
+						openFilter,
+						{
+							field: "priority",
+							op: "eq",
+							value: "urgent",
+						},
+					]),
+					countWhere("tickets", [
+						openFilter,
+						{ field: "priority", op: "eq", value: "high" },
+					]),
+					countWhere("tickets", [
+						openFilter,
+						{
+							field: "priority",
+							op: "eq",
+							value: "medium",
+						},
+					]),
+					countWhere("tickets", [
+						openFilter,
+						{ field: "priority", op: "eq", value: "low" },
+					]),
+				]);
 
-				const open = openTickets.count ?? 0;
-				const closed = closedTickets.count ?? 0;
-
-				const urgent = urgentTickets.count ?? 0;
-				const high = highTickets.count ?? 0;
-				const medium = mediumTickets.count ?? 0;
-				const low = lowTickets.count ?? 0;
-
-				const customersCreatedThisWeek = recentCustomers.count ?? 0;
-				const ticketsClosedThisWeek = recentClosedTickets.count ?? 0;
+				const [
+					productsResult,
+					customersCreatedThisWeek,
+					ticketsClosedThisWeek,
+				] = await Promise.all([
+					supabase.from("products").select("price_cents, category"),
+					countWhere("customers", [
+						{
+							field: "created_at",
+							op: "gte",
+							value: sevenDaysAgo,
+						},
+					]),
+					countWhere("tickets", [
+						{ field: "status", op: "eq", value: "closed" },
+						{
+							field: "closed_at",
+							op: "gte",
+							value: sevenDaysAgo,
+						},
+					]),
+				]);
 
 				let productValue = "Error loading product data";
 				let categoryBreakdown: { category: string; value: string }[] = [];

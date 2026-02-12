@@ -3,11 +3,12 @@ import { z } from "zod";
 import {
 	dbErrorResponse,
 	jsonResponse,
+	listResponse,
 	notFoundResponse,
 	textResponse,
 } from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
-import { CustomerStatus } from "../lib/validation.js";
+import { CustomerStatus, uuidParam } from "../lib/validation.js";
 
 export function registerCustomerTools(server: McpServer): void {
 	// list_customers tool
@@ -40,21 +41,7 @@ export function registerCustomerTools(server: McpServer): void {
 				return dbErrorResponse(error);
 			}
 
-			const results = data || [];
-			const response: {
-				results: typeof results;
-				count: number;
-				message?: string;
-			} = {
-				results,
-				count: results.length,
-			};
-
-			if (results.length === 0) {
-				response.message = "No customers match your filters";
-			}
-
-			return jsonResponse(response);
+			return listResponse(data || [], "No customers match your filters");
 		},
 	);
 
@@ -63,7 +50,7 @@ export function registerCustomerTools(server: McpServer): void {
 		"get_customer",
 		"Get a single customer by ID, including their ticket summary",
 		{
-			id: z.string().uuid("Customer ID must be a valid UUID"),
+			id: uuidParam("Customer ID"),
 		},
 		async (args) => {
 			const { id } = args;
@@ -97,10 +84,15 @@ export function registerCustomerTools(server: McpServer): void {
 				.limit(3);
 
 			if (totalError || openError || recentError) {
-				const errorMsg =
-					totalError?.message || openError?.message || recentError?.message;
+				const messages = [
+					totalError?.message,
+					openError?.message,
+					recentError?.message,
+				]
+					.filter(Boolean)
+					.join(", ");
 				return textResponse(
-					`Database error while fetching ticket data: ${errorMsg}`,
+					`Database error while fetching ticket data: ${messages}`,
 				);
 			}
 
@@ -118,8 +110,8 @@ export function registerCustomerTools(server: McpServer): void {
 		"create_customer",
 		"Create a new customer with name, email, optional company and status",
 		{
-			name: z.string().min(1, "Customer name is required"),
-			email: z.string().email("Invalid email format"),
+			name: z.string().min(1, { error: "Customer name is required" }),
+			email: z.email({ error: "Invalid email format" }),
 			company: z.string().optional(),
 			status: CustomerStatus.optional(),
 		},
@@ -154,9 +146,9 @@ export function registerCustomerTools(server: McpServer): void {
 		"update_customer",
 		"Update customer fields by ID. Only send the fields you want to change.",
 		{
-			id: z.string().uuid("Customer ID must be a valid UUID"),
+			id: uuidParam("Customer ID"),
 			name: z.string().optional(),
-			email: z.string().email("Invalid email format").optional(),
+			email: z.email({ error: "Invalid email format" }).optional(),
 			company: z.string().optional(),
 			status: CustomerStatus.optional(),
 		},
@@ -181,9 +173,10 @@ export function registerCustomerTools(server: McpServer): void {
 
 			if (error) {
 				if (error.code === "23505") {
-					return textResponse(
-						`Email "${email}" is already taken by another customer`,
-					);
+					const msg = email
+						? `Email "${email}" is already taken by another customer`
+						: "A customer with that email already exists";
+					return textResponse(msg);
 				}
 				return dbErrorResponse(error);
 			}
