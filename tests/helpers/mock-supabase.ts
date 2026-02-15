@@ -1,3 +1,4 @@
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { vi } from "vitest";
 
 type QueryResult = {
@@ -41,4 +42,13 @@ export function createSupabaseMock() {
 		supabase: { from: vi.fn() },
 		validateConnection: vi.fn().mockResolvedValue(undefined),
 	};
+}
+
+// Extract the text content from an MCP tool result, removing `as any` casts
+export function getToolText(result: CallToolResult): string {
+	return (result.content[0] as { type: "text"; text: string }).text;
+}
+
+export function getToolJson(result: CallToolResult): unknown {
+	return JSON.parse(getToolText(result));
 }

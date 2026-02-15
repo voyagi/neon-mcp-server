@@ -1,6 +1,14 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { resolveCustomerIds, resolveOneCustomer } from "../lib/customers.js";
+import {
+	resolveCustomerIds,
+	resolveOneCustomer,
+	validateCustomerExists,
+} from "../lib/customers.js";
+import {
+	formatTicketListItem,
+	formatTicketWithCustomer,
+} from "../lib/formatters.js";
 import {
 	dbErrorResponse,
 	jsonResponse,
@@ -58,11 +66,7 @@ export function registerTicketTools(server: McpServer): void {
 				return dbErrorResponse(error);
 			}
 
-			const results = (data || []).map((ticket) => ({
-				...ticket,
-				customer_name: ticket.customers?.name || "Unknown Customer",
-				customers: undefined,
-			}));
+			const results = (data || []).map(formatTicketListItem);
 
 			return listResponse(results, "No tickets match your filters");
 		},
@@ -98,20 +102,7 @@ export function registerTicketTools(server: McpServer): void {
 				return notFoundResponse("Ticket", id);
 			}
 
-			const response = {
-				...data,
-				customer: data.customers
-					? {
-							id: data.customers.id,
-							name: data.customers.name,
-							email: data.customers.email,
-							company: data.customers.company,
-						}
-					: null,
-				customers: undefined,
-			};
-
-			return jsonResponse(response);
+			return jsonResponse(formatTicketWithCustomer(data));
 		},
 	);
 
@@ -120,7 +111,7 @@ export function registerTicketTools(server: McpServer): void {
 		"create_ticket",
 		"Create a new support ticket. Provide customer_id or customer_name to link the ticket.",
 		{
-			customer_id: z.guid().optional(),
+			customer_id: uuidParam("Customer ID").optional(),
 			customer_name: z.string().optional(),
 			subject: z.string().min(1),
 			description: z.string().optional(),
@@ -137,19 +128,9 @@ export function registerTicketTools(server: McpServer): void {
 			let finalCustomerId: string;
 
 			if (customer_id) {
-				// Validate that the provided ID exists
-				const { data: customerCheck, error: customerCheckError } =
-					await supabase
-						.from("customers")
-						.select("id")
-						.eq("id", customer_id)
-						.single();
-
-				if (customerCheckError || !customerCheck) {
-					return notFoundResponse("Customer", customer_id);
-				}
-
-				finalCustomerId = customer_id;
+				const check = await validateCustomerExists(customer_id);
+				if (!check.ok) return check.response;
+				finalCustomerId = check.customerId;
 			} else {
 				const result = await resolveOneCustomer(customer_name as string);
 				if (!result.ok) return result.response;

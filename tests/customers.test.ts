@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseMock, mockQuery } from "./helpers/mock-supabase.js";
+import {
+	createSupabaseMock,
+	getToolJson,
+	getToolText,
+	mockQuery,
+} from "./helpers/mock-supabase.js";
 
 vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
 
@@ -41,7 +46,7 @@ describe("list_customers", () => {
 			arguments: {},
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(2);
 		expect(parsed.results).toHaveLength(2);
 		expect(parsed.results[0].name).toBe("Alice");
@@ -55,7 +60,7 @@ describe("list_customers", () => {
 			arguments: { status: "inactive" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(0);
 		expect(parsed.message).toContain("No customers");
 	});
@@ -70,7 +75,7 @@ describe("list_customers", () => {
 			arguments: {},
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("Database error");
 		expect(text).toContain("connection lost");
 	});
@@ -104,15 +109,18 @@ describe("get_customer", () => {
 			arguments: { id: "abc00000-0000-0000-0000-000000000123" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.name).toBe("Alice");
 		expect(parsed.total_tickets_count).toBe(5);
 		expect(parsed.open_tickets_count).toBe(2);
 	});
 
-	it("returns not found for invalid ID", async () => {
+	it("returns not found for PGRST116 error", async () => {
 		mockedFrom.mockReturnValue(
-			mockQuery({ data: null, error: { message: "not found" } }),
+			mockQuery({
+				data: null,
+				error: { message: "not found", code: "PGRST116" },
+			}),
 		);
 
 		const result = await client.callTool({
@@ -120,8 +128,26 @@ describe("get_customer", () => {
 			arguments: { id: "abc00000-0000-0000-0000-000000000999" },
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("not found");
+	});
+
+	it("returns database error for non-PGRST116 errors", async () => {
+		mockedFrom.mockReturnValue(
+			mockQuery({
+				data: null,
+				error: { message: "connection timeout", code: "PGRST000" },
+			}),
+		);
+
+		const result = await client.callTool({
+			name: "get_customer",
+			arguments: { id: "abc00000-0000-0000-0000-000000000123" },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("Database error");
+		expect(text).toContain("connection timeout");
 	});
 });
 
@@ -142,7 +168,7 @@ describe("create_customer", () => {
 			arguments: { name: "Charlie", email: "c@test.com" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.name).toBe("Charlie");
 	});
 
@@ -159,7 +185,7 @@ describe("create_customer", () => {
 			arguments: { name: "Charlie", email: "existing@test.com" },
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("already exists");
 	});
 });
@@ -184,7 +210,7 @@ describe("update_customer", () => {
 			},
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.name).toBe("Alice Updated");
 	});
 
@@ -194,7 +220,7 @@ describe("update_customer", () => {
 			arguments: { id: "abc00000-0000-0000-0000-000000000123" },
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("No fields");
 	});
 });

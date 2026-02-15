@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseMock, mockQuery } from "./helpers/mock-supabase.js";
+import {
+	createSupabaseMock,
+	getToolJson,
+	getToolText,
+	mockQuery,
+} from "./helpers/mock-supabase.js";
 
 vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
 
@@ -43,7 +48,7 @@ describe("list_tickets", () => {
 			arguments: {},
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(1);
 		expect(parsed.results[0].customer_name).toBe("Alice");
 	});
@@ -78,8 +83,62 @@ describe("list_tickets", () => {
 			arguments: { customer_name: "Alice" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(1);
+	});
+});
+
+describe("get_ticket", () => {
+	it("returns ticket with customer info", async () => {
+		const ticketId = "abc00000-0000-0000-0000-000000000001";
+
+		mockedFrom.mockReturnValue(
+			mockQuery({
+				data: {
+					id: ticketId,
+					subject: "Login broken",
+					status: "open",
+					priority: "high",
+					customers: {
+						id: "c1",
+						name: "Alice",
+						email: "alice@test.com",
+						company: "Acme",
+					},
+				},
+				error: null,
+			}),
+		);
+
+		const result = await client.callTool({
+			name: "get_ticket",
+			arguments: { id: ticketId },
+		});
+
+		const parsed = getToolJson(result);
+		expect(parsed.subject).toBe("Login broken");
+		expect(parsed.customer.name).toBe("Alice");
+		expect(parsed.customer.company).toBe("Acme");
+		expect(parsed.customers).toBeUndefined();
+	});
+
+	it("returns not found for missing ticket", async () => {
+		const ticketId = "abc00000-0000-0000-0000-000000000999";
+
+		mockedFrom.mockReturnValue(
+			mockQuery({
+				data: null,
+				error: { message: "not found" },
+			}),
+		);
+
+		const result = await client.callTool({
+			name: "get_ticket",
+			arguments: { id: ticketId },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("not found");
 	});
 });
 
@@ -114,7 +173,7 @@ describe("create_ticket", () => {
 			},
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.subject).toBe("New issue");
 	});
 
@@ -124,7 +183,7 @@ describe("create_ticket", () => {
 			arguments: { subject: "Orphan ticket" },
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("customer_id or customer_name");
 	});
 
@@ -145,7 +204,7 @@ describe("create_ticket", () => {
 			arguments: { customer_name: "Alice", subject: "Help" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.error).toContain("Multiple customers");
 		expect(parsed.matches).toHaveLength(2);
 	});
@@ -181,7 +240,7 @@ describe("close_ticket", () => {
 			arguments: { id: ticketId, resolution: "Fixed the bug" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.status).toBe("closed");
 		expect(parsed.resolution).toBe("Fixed the bug");
 	});
@@ -201,7 +260,7 @@ describe("close_ticket", () => {
 			arguments: { id: ticketId },
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("already closed");
 	});
 });

@@ -1,4 +1,18 @@
+// Exposes the TechStart CRM database schema as an MCP resource,
+// allowing Claude to understand table structure, columns, constraints,
+// and relationships without querying the database directly.
+
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+	CUSTOMER_STATUSES,
+	TICKET_PRIORITIES,
+	TICKET_STATUSES,
+} from "../lib/validation.js";
+
+/** Generates a SQL CHECK constraint expression: column IN ('val1', 'val2', ...) */
+function checkIn(column: string, values: readonly string[]): string {
+	return `${column} IN (${values.map((v) => `'${v}'`).join(", ")})`;
+}
 
 interface SchemaColumn {
 	name: string;
@@ -76,7 +90,7 @@ const customersTable: SchemaTable = {
 			type: "text",
 			nullable: false,
 			default: "'active'",
-			description: "Customer status. Valid values: active, inactive, lead",
+			description: `Customer status. Valid values: ${CUSTOMER_STATUSES.join(", ")}`,
 		},
 		{
 			name: "created_at",
@@ -92,7 +106,7 @@ const customersTable: SchemaTable = {
 		{
 			type: "CHECK",
 			columns: ["status"],
-			expression: "status IN ('active', 'inactive', 'lead')",
+			expression: checkIn("status", CUSTOMER_STATUSES),
 		},
 	],
 	relationships: [],
@@ -188,15 +202,14 @@ const ticketsTable: SchemaTable = {
 			type: "text",
 			nullable: false,
 			default: "'open'",
-			description: "Ticket status. Valid values: open, in_progress, closed",
+			description: `Ticket status. Valid values: ${TICKET_STATUSES.join(", ")}`,
 		},
 		{
 			name: "priority",
 			type: "text",
 			nullable: false,
 			default: "'medium'",
-			description:
-				"Ticket priority level. Valid values: low, medium, high, urgent",
+			description: `Ticket priority level. Valid values: ${TICKET_PRIORITIES.join(", ")}`,
 		},
 		{
 			name: "created_at",
@@ -226,12 +239,12 @@ const ticketsTable: SchemaTable = {
 		{
 			type: "CHECK",
 			columns: ["status"],
-			expression: "status IN ('open', 'in_progress', 'closed')",
+			expression: checkIn("status", TICKET_STATUSES),
 		},
 		{
 			type: "CHECK",
 			columns: ["priority"],
-			expression: "priority IN ('low', 'medium', 'high', 'urgent')",
+			expression: checkIn("priority", TICKET_PRIORITIES),
 		},
 		{
 			type: "FOREIGN KEY",
@@ -254,6 +267,7 @@ const ticketsTable: SchemaTable = {
 	],
 };
 
+/** Assembles the complete database schema definition for all CRM tables */
 function buildSchema(): DatabaseSchema {
 	return {
 		description:

@@ -12,10 +12,25 @@ function enumSchema<T extends string>(values: readonly [T, ...T[]]) {
 	});
 }
 
-export const CustomerStatus = enumSchema(["active", "inactive", "lead"]);
-export const TicketStatus = enumSchema(["open", "in_progress", "closed"]);
-export const TicketPriority = enumSchema(["low", "medium", "high", "urgent"]);
+export const CUSTOMER_STATUSES = ["active", "inactive", "lead"] as const;
+export const TICKET_STATUSES = ["open", "in_progress", "closed"] as const;
+export const TICKET_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+
+export const CustomerStatus = enumSchema(CUSTOMER_STATUSES);
+export const TicketStatus = enumSchema(TICKET_STATUSES);
+export const TicketPriority = enumSchema(TICKET_PRIORITIES);
 
 export function uuidParam(label: string) {
 	return z.guid({ error: `${label} must be a valid UUID` });
+}
+
+// Strip characters that are structural in PostgREST filter syntax
+// to prevent filter injection when interpolating into .or() strings
+export function sanitizeFilterValue(value: string): string {
+	return value.replace(/[,()]/g, "");
+}
+
+// Escape LIKE/ILIKE wildcards so user input is matched literally
+export function sanitizeLikeValue(value: string): string {
+	return value.replace(/[%_\\]/g, "\\$&");
 }

@@ -2,9 +2,11 @@ import {
 	jsonResponse,
 	listResponse,
 	type McpToolResponse,
+	notFoundResponse,
 	textResponse,
 } from "./responses.js";
 import { supabase } from "./supabase.js";
+import { sanitizeLikeValue } from "./validation.js";
 
 // Shared customer name resolution — used by ticket tools
 export async function findCustomersByName(name: string): Promise<{
@@ -14,7 +16,7 @@ export async function findCustomersByName(name: string): Promise<{
 	const { data, error } = await supabase
 		.from("customers")
 		.select("id, name")
-		.ilike("name", `%${name}%`);
+		.ilike("name", `%${sanitizeLikeValue(name)}%`);
 
 	if (error) {
 		return { data: null, error: error.message };
@@ -84,4 +86,21 @@ export async function resolveOneCustomer(
 	}
 
 	return { ok: true, customerId: result.data[0].id };
+}
+
+// For create_ticket — validates that a customer ID exists in the database
+export async function validateCustomerExists(
+	id: string,
+): Promise<ResolveOk<{ customerId: string }> | ResolveFail> {
+	const { data, error } = await supabase
+		.from("customers")
+		.select("id")
+		.eq("id", id)
+		.single();
+
+	if (error || !data) {
+		return { ok: false, response: notFoundResponse("Customer", id) };
+	}
+
+	return { ok: true, customerId: data.id };
 }

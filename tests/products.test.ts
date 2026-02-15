@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseMock, mockQuery } from "./helpers/mock-supabase.js";
+import {
+	createSupabaseMock,
+	getToolJson,
+	getToolText,
+	mockQuery,
+} from "./helpers/mock-supabase.js";
 
 vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
 
@@ -44,7 +49,7 @@ describe("list_products", () => {
 			arguments: {},
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(1);
 		expect(parsed.results[0].price_display).toBe("$49.00");
 		expect(parsed.results[0].price_cents).toBe(4900);
@@ -60,7 +65,7 @@ describe("list_products", () => {
 			arguments: {},
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("Database error");
 	});
 });
@@ -84,7 +89,7 @@ describe("search_products", () => {
 			arguments: { query: "enterprise" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(1);
 		expect(parsed.results[0].name).toBe("Enterprise Plan");
 		expect(parsed.results[0].price_display).toBe("$499.00");
@@ -98,7 +103,7 @@ describe("search_products", () => {
 			arguments: { query: "nonexistent" },
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(0);
 		expect(parsed.message).toContain("nonexistent");
 	});

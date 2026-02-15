@@ -3,6 +3,9 @@ import {
 	CustomerStatus,
 	TicketPriority,
 	TicketStatus,
+	sanitizeFilterValue,
+	sanitizeLikeValue,
+	uuidParam,
 } from "../src/lib/validation.js";
 
 describe("CustomerStatus enum", () => {
@@ -54,5 +57,64 @@ describe("TicketPriority enum", () => {
 			expect(result.error.issues[0].message).toContain("critical");
 			expect(result.error.issues[0].message).toContain("low");
 		}
+	});
+});
+
+describe("uuidParam", () => {
+	it("accepts a valid UUID", () => {
+		const schema = uuidParam("Test ID");
+		const result = schema.safeParse("abc00000-0000-0000-0000-000000000001");
+		expect(result.success).toBe(true);
+	});
+
+	it("rejects non-UUID strings with label in error", () => {
+		const schema = uuidParam("Customer ID");
+		const result = schema.safeParse("not-a-uuid");
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues[0].message).toContain("Customer ID");
+		}
+	});
+});
+
+describe("sanitizeFilterValue", () => {
+	it("passes through normal search terms", () => {
+		expect(sanitizeFilterValue("enterprise")).toBe("enterprise");
+	});
+
+	it("strips commas to prevent filter injection", () => {
+		expect(sanitizeFilterValue("test,id.eq.secret")).toBe(
+			"testid.eq.secret",
+		);
+	});
+
+	it("strips parentheses", () => {
+		expect(sanitizeFilterValue("name(test)")).toBe("nametest");
+	});
+
+	it("handles empty string", () => {
+		expect(sanitizeFilterValue("")).toBe("");
+	});
+});
+
+describe("sanitizeLikeValue", () => {
+	it("passes through normal search terms", () => {
+		expect(sanitizeLikeValue("alice")).toBe("alice");
+	});
+
+	it("escapes percent wildcards", () => {
+		expect(sanitizeLikeValue("100%")).toBe("100\\%");
+	});
+
+	it("escapes underscore wildcards", () => {
+		expect(sanitizeLikeValue("test_name")).toBe("test\\_name");
+	});
+
+	it("escapes backslashes", () => {
+		expect(sanitizeLikeValue("path\\to")).toBe("path\\\\to");
+	});
+
+	it("handles empty string", () => {
+		expect(sanitizeLikeValue("")).toBe("");
 	});
 });

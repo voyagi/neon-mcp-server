@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { PG_UNIQUE_VIOLATION, PGRST_NOT_FOUND } from "../lib/errors.js";
 import {
 	dbErrorResponse,
 	jsonResponse,
@@ -8,7 +9,11 @@ import {
 	textResponse,
 } from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
-import { CustomerStatus, uuidParam } from "../lib/validation.js";
+import {
+	CustomerStatus,
+	sanitizeLikeValue,
+	uuidParam,
+} from "../lib/validation.js";
 
 export function registerCustomerTools(server: McpServer): void {
 	// list_customers tool
@@ -32,7 +37,7 @@ export function registerCustomerTools(server: McpServer): void {
 			}
 
 			if (company) {
-				query = query.ilike("company", `%${company}%`);
+				query = query.ilike("company", `%${sanitizeLikeValue(company)}%`);
 			}
 
 			const { data, error } = await query;
@@ -61,27 +66,38 @@ export function registerCustomerTools(server: McpServer): void {
 				.eq("id", id)
 				.single();
 
-			if (customerError || !customer) {
+			if (customerError) {
+				if (customerError.code === PGRST_NOT_FOUND) {
+					return notFoundResponse("Customer", id);
+				}
+				return dbErrorResponse(customerError);
+			}
+
+			if (!customer) {
 				return notFoundResponse("Customer", id);
 			}
 
-			const { count: totalCount, error: totalError } = await supabase
-				.from("tickets")
-				.select("id", { count: "exact", head: true })
-				.eq("customer_id", id);
-
-			const { count: openCount, error: openError } = await supabase
-				.from("tickets")
-				.select("id", { count: "exact", head: true })
-				.eq("customer_id", id)
-				.neq("status", "closed");
-
-			const { data: recentTickets, error: recentError } = await supabase
-				.from("tickets")
-				.select("subject, status, created_at")
-				.eq("customer_id", id)
-				.order("created_at", { ascending: false })
-				.limit(3);
+			const [
+				{ count: totalCount, error: totalError },
+				{ count: openCount, error: openError },
+				{ data: recentTickets, error: recentError },
+			] = await Promise.all([
+				supabase
+					.from("tickets")
+					.select("id", { count: "exact", head: true })
+					.eq("customer_id", id),
+				supabase
+					.from("tickets")
+					.select("id", { count: "exact", head: true })
+					.eq("customer_id", id)
+					.neq("status", "closed"),
+				supabase
+					.from("tickets")
+					.select("subject, status, created_at")
+					.eq("customer_id", id)
+					.order("created_at", { ascending: false })
+					.limit(3),
+			]);
 
 			if (totalError || openError || recentError) {
 				const messages = [
@@ -129,7 +145,7 @@ export function registerCustomerTools(server: McpServer): void {
 				.select();
 
 			if (error) {
-				if (error.code === "23505") {
+				if (error.code === PG_UNIQUE_VIOLATION) {
 					return textResponse(
 						`A customer with email "${email}" already exists`,
 					);
@@ -147,7 +163,10 @@ export function registerCustomerTools(server: McpServer): void {
 		"Update customer fields by ID. Only send the fields you want to change.",
 		{
 			id: uuidParam("Customer ID"),
-			name: z.string().optional(),
+			name: z
+				.string()
+				.min(1, { error: "Customer name cannot be empty" })
+				.optional(),
 			email: z.email({ error: "Invalid email format" }).optional(),
 			company: z.string().optional(),
 			status: CustomerStatus.optional(),
@@ -172,7 +191,7 @@ export function registerCustomerTools(server: McpServer): void {
 				.select();
 
 			if (error) {
-				if (error.code === "23505") {
+				if (error.code === PG_UNIQUE_VIOLATION) {
 					const msg = email
 						? `Email "${email}" is already taken by another customer`
 						: "A customer with that email already exists";

@@ -19,12 +19,105 @@ async function countWhere(
 		else if (op === "neq") query = query.neq(field, value);
 		else query = query.gte(field, value);
 	}
-	const { count } = await query;
+	const { count, error } = await query;
+	if (error) throw error;
 	return count ?? 0;
 }
 
+/** Aggregates product prices by category into formatted display values */
+export function aggregateByCategory(
+	products: { price_cents: number; category: string }[],
+): { category: string; value: string }[] {
+	const totals = products.reduce<Record<string, number>>((acc, product) => {
+		acc[product.category] = (acc[product.category] || 0) + product.price_cents;
+		return acc;
+	}, {});
+
+	return Object.entries(totals).map(([category, cents]) => ({
+		category,
+		value: formatPrice(cents),
+	}));
+}
+
+async function fetchCustomerCounts() {
+	const [active, inactive, leads] = await Promise.all([
+		countWhere("customers", [{ field: "status", op: "eq", value: "active" }]),
+		countWhere("customers", [{ field: "status", op: "eq", value: "inactive" }]),
+		countWhere("customers", [{ field: "status", op: "eq", value: "lead" }]),
+	]);
+	return { active, inactive, leads, total: active + inactive + leads };
+}
+
+async function fetchTicketCounts() {
+	const openFilter: CountFilter = {
+		field: "status",
+		op: "neq",
+		value: "closed",
+	};
+
+	const [open, closed, urgent, high, medium, low] = await Promise.all([
+		countWhere("tickets", [openFilter]),
+		countWhere("tickets", [{ field: "status", op: "eq", value: "closed" }]),
+		countWhere("tickets", [
+			openFilter,
+			{ field: "priority", op: "eq", value: "urgent" },
+		]),
+		countWhere("tickets", [
+			openFilter,
+			{ field: "priority", op: "eq", value: "high" },
+		]),
+		countWhere("tickets", [
+			openFilter,
+			{ field: "priority", op: "eq", value: "medium" },
+		]),
+		countWhere("tickets", [
+			openFilter,
+			{ field: "priority", op: "eq", value: "low" },
+		]),
+	]);
+
+	return {
+		open,
+		closed,
+		total: open + closed,
+		by_priority: { urgent, high, medium, low },
+	};
+}
+
+async function fetchProductStats() {
+	const { data: products, error } = await supabase
+		.from("products")
+		.select("price_cents, category");
+
+	if (error || !products) {
+		return { total_value: "Error loading product data", by_category: [] };
+	}
+
+	const totalValue = products.reduce((sum, p) => sum + p.price_cents, 0);
+	return {
+		total_value: formatPrice(totalValue),
+		by_category: aggregateByCategory(products),
+	};
+}
+
+async function fetchRecentActivity(sevenDaysAgo: string) {
+	const [customersCreatedThisWeek, ticketsClosedThisWeek] = await Promise.all([
+		countWhere("customers", [
+			{ field: "created_at", op: "gte", value: sevenDaysAgo },
+		]),
+		countWhere("tickets", [
+			{ field: "status", op: "eq", value: "closed" },
+			{ field: "closed_at", op: "gte", value: sevenDaysAgo },
+		]),
+	]);
+
+	return {
+		customers_created_this_week: customersCreatedThisWeek,
+		tickets_closed_this_week: ticketsClosedThisWeek,
+	};
+}
+
 export function registerAnalyticsTools(server: McpServer): void {
-	// get_summary tool
 	server.tool(
 		"get_summary",
 		"Get a dashboard summary with customer counts, ticket stats, product catalog value, and recent activity",
@@ -35,124 +128,19 @@ export function registerAnalyticsTools(server: McpServer): void {
 			).toISOString();
 
 			try {
-				const [active, inactive, leads] = await Promise.all([
-					countWhere("customers", [
-						{ field: "status", op: "eq", value: "active" },
-					]),
-					countWhere("customers", [
-						{ field: "status", op: "eq", value: "inactive" },
-					]),
-					countWhere("customers", [
-						{ field: "status", op: "eq", value: "lead" },
-					]),
-				]);
-
-				const openFilter: CountFilter = {
-					field: "status",
-					op: "neq",
-					value: "closed",
-				};
-
-				const [open, closed, urgent, high, medium, low] = await Promise.all([
-					countWhere("tickets", [openFilter]),
-					countWhere("tickets", [
-						{ field: "status", op: "eq", value: "closed" },
-					]),
-					countWhere("tickets", [
-						openFilter,
-						{
-							field: "priority",
-							op: "eq",
-							value: "urgent",
-						},
-					]),
-					countWhere("tickets", [
-						openFilter,
-						{ field: "priority", op: "eq", value: "high" },
-					]),
-					countWhere("tickets", [
-						openFilter,
-						{
-							field: "priority",
-							op: "eq",
-							value: "medium",
-						},
-					]),
-					countWhere("tickets", [
-						openFilter,
-						{ field: "priority", op: "eq", value: "low" },
-					]),
-				]);
-
-				const [
-					productsResult,
-					customersCreatedThisWeek,
-					ticketsClosedThisWeek,
-				] = await Promise.all([
-					supabase.from("products").select("price_cents, category"),
-					countWhere("customers", [
-						{
-							field: "created_at",
-							op: "gte",
-							value: sevenDaysAgo,
-						},
-					]),
-					countWhere("tickets", [
-						{ field: "status", op: "eq", value: "closed" },
-						{
-							field: "closed_at",
-							op: "gte",
-							value: sevenDaysAgo,
-						},
-					]),
-				]);
-
-				let productValue = "Error loading product data";
-				let categoryBreakdown: { category: string; value: string }[] = [];
-
-				if (!productsResult.error && productsResult.data) {
-					const products = productsResult.data;
-					const totalValue = products.reduce(
-						(sum, p) => sum + p.price_cents,
-						0,
-					);
-
-					const categoryTotals: Record<string, number> = {};
-					for (const product of products) {
-						categoryTotals[product.category] =
-							(categoryTotals[product.category] || 0) + product.price_cents;
-					}
-
-					productValue = formatPrice(totalValue);
-					categoryBreakdown = Object.entries(categoryTotals).map(
-						([category, value]) => ({
-							category,
-							value: formatPrice(value),
-						}),
-					);
-				}
+				const [customers, tickets, products, recentActivity] =
+					await Promise.all([
+						fetchCustomerCounts(),
+						fetchTicketCounts(),
+						fetchProductStats(),
+						fetchRecentActivity(sevenDaysAgo),
+					]);
 
 				return jsonResponse({
-					customers: {
-						active,
-						inactive,
-						leads,
-						total: active + inactive + leads,
-					},
-					tickets: {
-						open,
-						closed,
-						total: open + closed,
-						by_priority: { urgent, high, medium, low },
-					},
-					products: {
-						total_value: productValue,
-						by_category: categoryBreakdown,
-					},
-					recent_activity: {
-						customers_created_this_week: customersCreatedThisWeek,
-						tickets_closed_this_week: ticketsClosedThisWeek,
-					},
+					customers,
+					tickets,
+					products,
+					recent_activity: recentActivity,
 				});
 			} catch (error) {
 				return textResponse(

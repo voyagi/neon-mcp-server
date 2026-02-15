@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseMock, mockQuery } from "./helpers/mock-supabase.js";
+import {
+	createSupabaseMock,
+	getToolJson,
+	getToolText,
+	mockQuery,
+} from "./helpers/mock-supabase.js";
 
 vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
 
 import { supabase } from "../src/lib/supabase.js";
 import { createServer } from "../src/server.js";
+import { aggregateByCategory } from "../src/tools/analytics.js";
 
 const mockedFrom = vi.mocked(supabase.from);
 
@@ -84,7 +90,7 @@ describe("get_summary", () => {
 			arguments: {},
 		});
 
-		const parsed = JSON.parse((result.content as any)[0].text);
+		const parsed = getToolJson(result);
 
 		expect(parsed.customers.active).toBe(15);
 		expect(parsed.customers.inactive).toBe(4);
@@ -113,7 +119,107 @@ describe("get_summary", () => {
 			arguments: {},
 		});
 
-		const text = (result.content as any)[0].text;
+		const text = getToolText(result);
 		expect(text).toContain("Error fetching summary");
+	});
+
+	it("returns partial results when products query fails", async () => {
+		// Customer counts (3 queries)
+		mockedFrom
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 10 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 2 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			);
+
+		// Ticket counts (6 queries)
+		mockedFrom
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 5 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 3 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 2 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			);
+
+		// Products query fails
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({ data: null, error: { message: "table not found" } }),
+		);
+
+		// Recent activity (2 queries)
+		mockedFrom
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 0 }),
+			);
+
+		const result = await client.callTool({
+			name: "get_summary",
+			arguments: {},
+		});
+
+		const parsed = getToolJson(result);
+
+		// Customer and ticket counts should still work
+		expect(parsed.customers.total).toBe(13);
+		expect(parsed.tickets.total).toBe(8);
+
+		// Products should show error fallback
+		expect(parsed.products.total_value).toBe("Error loading product data");
+		expect(parsed.products.by_category).toEqual([]);
+
+		// Recent activity should still work
+		expect(parsed.recent_activity.customers_created_this_week).toBe(1);
+	});
+});
+
+describe("aggregateByCategory", () => {
+	it("groups products by category and formats prices", () => {
+		const products = [
+			{ price_cents: 4900, category: "subscription" },
+			{ price_cents: 14900, category: "subscription" },
+			{ price_cents: 2900, category: "add-on" },
+		];
+
+		const result = aggregateByCategory(products);
+
+		expect(result).toHaveLength(2);
+		const sub = result.find((r) => r.category === "subscription");
+		const addon = result.find((r) => r.category === "add-on");
+		expect(sub?.value).toBe("$198.00");
+		expect(addon?.value).toBe("$29.00");
+	});
+
+	it("returns empty array for no products", () => {
+		expect(aggregateByCategory([])).toEqual([]);
+	});
+
+	it("handles single category", () => {
+		const products = [
+			{ price_cents: 1000, category: "tools" },
+			{ price_cents: 2000, category: "tools" },
+		];
+
+		const result = aggregateByCategory(products);
+		expect(result).toHaveLength(1);
+		expect(result[0].value).toBe("$30.00");
 	});
 });

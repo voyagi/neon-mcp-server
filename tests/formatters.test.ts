@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatPrice, formatProduct } from "../src/lib/formatters.js";
+import {
+	formatPrice,
+	formatProduct,
+	formatTicketListItem,
+	formatTicketWithCustomer,
+} from "../src/lib/formatters.js";
 
 describe("formatPrice", () => {
 	it("formats zero cents", () => {
@@ -52,5 +57,79 @@ describe("formatProduct", () => {
 
 		expect(result.price_display).toBe("$29.00");
 		expect(result.description).toBeNull();
+	});
+});
+
+describe("formatTicketListItem", () => {
+	it("extracts customer name from nested customers object", () => {
+		const ticket = {
+			id: "t1",
+			subject: "Bug report",
+			status: "open",
+			customers: { name: "Alice" },
+		};
+
+		const result = formatTicketListItem(ticket);
+		expect(result.customer_name).toBe("Alice");
+		expect(result.customers).toBeUndefined();
+		expect(result.subject).toBe("Bug report");
+	});
+
+	it("uses fallback when customers is null", () => {
+		const ticket = {
+			id: "t1",
+			subject: "Bug",
+			customers: null,
+		};
+
+		const result = formatTicketListItem(ticket);
+		expect(result.customer_name).toBe("Unknown Customer");
+	});
+
+	it("uses fallback when customers is undefined", () => {
+		const ticket = {
+			id: "t1",
+			subject: "Bug",
+		};
+
+		const result = formatTicketListItem(ticket);
+		expect(result.customer_name).toBe("Unknown Customer");
+	});
+});
+
+describe("formatTicketWithCustomer", () => {
+	it("reshapes customers field to customer", () => {
+		const ticket = {
+			id: "t1",
+			subject: "Login broken",
+			status: "open",
+			customers: {
+				id: "c1",
+				name: "Alice",
+				email: "alice@test.com",
+				company: "Acme",
+			},
+		};
+
+		const result = formatTicketWithCustomer(ticket);
+		expect(result.customer).toEqual({
+			id: "c1",
+			name: "Alice",
+			email: "alice@test.com",
+			company: "Acme",
+		});
+		expect(result.customers).toBeUndefined();
+		expect(result.subject).toBe("Login broken");
+	});
+
+	it("returns null customer when customers is null", () => {
+		const ticket = {
+			id: "t1",
+			subject: "Orphan",
+			customers: null,
+		};
+
+		const result = formatTicketWithCustomer(ticket);
+		expect(result.customer).toBeNull();
 	});
 });
