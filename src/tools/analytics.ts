@@ -127,26 +127,37 @@ export function registerAnalyticsTools(server: McpServer): void {
 				Date.now() - 7 * 24 * 60 * 60 * 1000,
 			).toISOString();
 
-			try {
-				const [customers, tickets, products, recentActivity] =
-					await Promise.all([
-						fetchCustomerCounts(),
-						fetchTicketCounts(),
-						fetchProductStats(),
-						fetchRecentActivity(sevenDaysAgo),
-					]);
+			const results = await Promise.allSettled([
+				fetchCustomerCounts(),
+				fetchTicketCounts(),
+				fetchProductStats(),
+				fetchRecentActivity(sevenDaysAgo),
+			]);
 
-				return jsonResponse({
-					customers,
-					tickets,
-					products,
-					recent_activity: recentActivity,
-				});
-			} catch (error) {
-				return textResponse(
-					`Error fetching summary: ${error instanceof Error ? error.message : String(error)}`,
-				);
+			const [customers, tickets, products, recentActivity] = results;
+
+			const summary: Record<string, unknown> = {};
+			const errors: string[] = [];
+
+			if (customers.status === "fulfilled") summary.customers = customers.value;
+			else errors.push(`customers: ${customers.reason}`);
+
+			if (tickets.status === "fulfilled") summary.tickets = tickets.value;
+			else errors.push(`tickets: ${tickets.reason}`);
+
+			if (products.status === "fulfilled") summary.products = products.value;
+			else errors.push(`products: ${products.reason}`);
+
+			if (recentActivity.status === "fulfilled")
+				summary.recent_activity = recentActivity.value;
+			else errors.push(`recent_activity: ${recentActivity.reason}`);
+
+			if (Object.keys(summary).length === 0) {
+				return textResponse(`Error fetching summary: ${errors.join("; ")}`);
 			}
+
+			if (errors.length > 0) summary.errors = errors;
+			return jsonResponse(summary);
 		},
 	);
 }

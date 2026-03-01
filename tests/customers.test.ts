@@ -188,6 +188,20 @@ describe("create_customer", () => {
 		const text = getToolText(result);
 		expect(text).toContain("already exists");
 	});
+
+	it("handles empty data array from insert", async () => {
+		mockedFrom.mockReturnValue(
+			mockQuery({ data: [], error: null }),
+		);
+
+		const result = await client.callTool({
+			name: "create_customer",
+			arguments: { name: "Charlie", email: "c@test.com" },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("Customer created but could not be retrieved");
+	});
 });
 
 describe("update_customer", () => {

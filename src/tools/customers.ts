@@ -153,6 +153,10 @@ export function registerCustomerTools(server: McpServer): void {
 				return dbErrorResponse(error);
 			}
 
+			if (!data || data.length === 0) {
+				return textResponse("Customer created but could not be retrieved");
+			}
+
 			return jsonResponse(data[0]);
 		},
 	);

@@ -83,13 +83,15 @@ describe("sanitizeFilterValue", () => {
 	});
 
 	it("strips commas to prevent filter injection", () => {
-		expect(sanitizeFilterValue("test,id.eq.secret")).toBe(
-			"testid.eq.secret",
-		);
+		expect(sanitizeFilterValue("test,id.eq.secret")).toBe("testideqsecret");
 	});
 
 	it("strips parentheses", () => {
 		expect(sanitizeFilterValue("name(test)")).toBe("nametest");
+	});
+
+	it("strips periods to prevent PostgREST operator injection", () => {
+		expect(sanitizeFilterValue("id.eq.secret")).toBe("ideqsecret");
 	});
 
 	it("handles empty string", () => {

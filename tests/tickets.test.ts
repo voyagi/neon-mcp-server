@@ -214,14 +214,7 @@ describe("close_ticket", () => {
 	it("closes an open ticket", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000001";
 
-		// First call: fetch existing ticket
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: { status: "open", closed_at: null },
-				error: null,
-			}),
-		);
-		// Second call: update
+		// Update with .neq("status","closed") returns the updated row
 		mockedFrom.mockReturnValueOnce(
 			mockQuery({
 				data: [
@@ -248,6 +241,11 @@ describe("close_ticket", () => {
 	it("rejects closing an already-closed ticket", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000001";
 
+		// Update returns empty (no rows matched .neq filter)
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({ data: [], error: null }),
+		);
+		// Disambiguation read returns closed status
 		mockedFrom.mockReturnValueOnce(
 			mockQuery({
 				data: { status: "closed", closed_at: "2026-01-01" },
@@ -262,5 +260,114 @@ describe("close_ticket", () => {
 
 		const text = getToolText(result);
 		expect(text).toContain("already closed");
+	});
+
+	it("returns not found when ticket does not exist", async () => {
+		const ticketId = "abc00000-0000-0000-0000-000000000999";
+
+		// Update returns empty
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({ data: [], error: null }),
+		);
+		// Disambiguation read returns error (not found)
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({ data: null, error: { message: "not found" } }),
+		);
+
+		const result = await client.callTool({
+			name: "close_ticket",
+			arguments: { id: ticketId },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("not found");
+	});
+});
+
+describe("get_ticket error discrimination", () => {
+	it("returns not found for PGRST116 error", async () => {
+		const ticketId = "abc00000-0000-0000-0000-000000000999";
+
+		mockedFrom.mockReturnValue(
+			mockQuery({
+				data: null,
+				error: { message: "not found", code: "PGRST116" },
+			}),
+		);
+
+		const result = await client.callTool({
+			name: "get_ticket",
+			arguments: { id: ticketId },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("not found");
+	});
+
+	it("returns database error for non-PGRST116 errors", async () => {
+		const ticketId = "abc00000-0000-0000-0000-000000000001";
+
+		mockedFrom.mockReturnValue(
+			mockQuery({
+				data: null,
+				error: { message: "connection timeout", code: "PGRST000" },
+			}),
+		);
+
+		const result = await client.callTool({
+			name: "get_ticket",
+			arguments: { id: ticketId },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("Database error");
+		expect(text).toContain("connection timeout");
+	});
+});
+
+describe("create_ticket edge cases", () => {
+	it("handles FK violation when customer is deleted", async () => {
+		const customerId = "abc00000-0000-0000-0000-000000000001";
+
+		// Customer existence check passes
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({ data: { id: customerId }, error: null }),
+		);
+		// Insert fails with FK violation
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({
+				data: null,
+				error: { message: "violates foreign key", code: "23503" },
+			}),
+		);
+
+		const result = await client.callTool({
+			name: "create_ticket",
+			arguments: { customer_id: customerId, subject: "Help" },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("customer no longer exists");
+	});
+
+	it("handles empty data array from insert", async () => {
+		const customerId = "abc00000-0000-0000-0000-000000000001";
+
+		// Customer existence check
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({ data: { id: customerId }, error: null }),
+		);
+		// Insert returns empty array
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({ data: [], error: null }),
+		);
+
+		const result = await client.callTool({
+			name: "create_ticket",
+			arguments: { customer_id: customerId, subject: "Help" },
+		});
+
+		const text = getToolText(result);
+		expect(text).toContain("Ticket created but could not be retrieved");
 	});
 });

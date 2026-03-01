@@ -189,6 +189,71 @@ describe("get_summary", () => {
 		// Recent activity should still work
 		expect(parsed.recent_activity.customers_created_this_week).toBe(1);
 	});
+
+	it("returns partial data with errors array when some sections throw", async () => {
+		// Customer counts throw (3 queries that never happen)
+		// We make the first 3 mocks throw to simulate fetchCustomerCounts failing
+		mockedFrom
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: { message: "customers table locked" } }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 0 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 0 }),
+			);
+
+		// Ticket counts succeed (6 queries)
+		mockedFrom
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 5 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 3 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 2 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			);
+
+		// Products succeed
+		mockedFrom.mockReturnValueOnce(
+			mockQuery({
+				data: [{ price_cents: 1000, category: "tools" }],
+				error: null,
+			}),
+		);
+
+		// Recent activity succeed (2 queries)
+		mockedFrom
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 1 }),
+			)
+			.mockReturnValueOnce(
+				mockQuery({ data: null, error: null, count: 0 }),
+			);
+
+		const result = await client.callTool({
+			name: "get_summary",
+			arguments: {},
+		});
+
+		const parsed = getToolJson(result);
+
+		// Tickets, products, recent_activity should still be present
+		expect(parsed.tickets.total).toBe(8);
+		expect(parsed.products.total_value).toBe("$10.00");
+		expect(parsed.recent_activity.customers_created_this_week).toBe(1);
+	});
 });
 
 describe("aggregateByCategory", () => {

@@ -5,3 +5,6 @@ export const PGRST_NOT_FOUND = "PGRST116";
 
 /** PostgreSQL: unique constraint violation (e.g., duplicate email) */
 export const PG_UNIQUE_VIOLATION = "23505";
+
+/** PostgreSQL: foreign key constraint violation (e.g., referencing deleted customer) */
+export const PG_FK_VIOLATION = "23503";

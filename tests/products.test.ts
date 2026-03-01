@@ -107,4 +107,16 @@ describe("search_products", () => {
 		expect(parsed.count).toBe(0);
 		expect(parsed.message).toContain("nonexistent");
 	});
+
+	it("strips periods from search query to prevent filter injection", async () => {
+		mockedFrom.mockReturnValue(mockQuery({ data: [], error: null }));
+
+		const result = await client.callTool({
+			name: "search_products",
+			arguments: { query: "name.ilike.%admin%" },
+		});
+
+		const parsed = getToolJson(result);
+		expect(parsed.count).toBe(0);
+	});
 });
