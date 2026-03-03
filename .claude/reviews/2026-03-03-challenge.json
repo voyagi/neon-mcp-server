@@ -1,0 +1,186 @@
+{
+  "reviewedAt": "2026-03-03T18:41:00.000Z",
+  "target": "project (full sweep)",
+  "targetType": "code",
+  "lensesApplied": [
+    "code-review",
+    "logic-trace",
+    "error-paths",
+    "concurrency",
+    "regression",
+    "plan-critique",
+    "assumptions",
+    "integration",
+    "api-contracts",
+    "failure-sim",
+    "stress-scale",
+    "config",
+    "deps",
+    "debate",
+    "devil",
+    "tests"
+  ],
+  "rootCauseClusters": [
+    {
+      "name": "Wrong Sanitizer in Product Search",
+      "severity": "HIGH",
+      "description": "sanitizeFilterValue strips PostgREST structural chars but not LIKE wildcards (%, _). sanitizeLikeValue exists and is used correctly in customers.ts but not applied in products.ts. Mock tests cannot detect this because they don't inspect query construction.",
+      "findingIds": [0, 1, 2]
+    },
+    {
+      "name": "Silent Failure UX",
+      "severity": "HIGH",
+      "description": "Multiple error paths produce unhelpful output: process.exit(1) at module scope gives no MCP-level error, Promise.allSettled error interpolation produces [object Object], and formatPrice returns $NaN/$Infinity for bad inputs.",
+      "findingIds": [3, 4, 5]
+    },
+    {
+      "name": "Missing Pagination",
+      "severity": "MEDIUM",
+      "description": "All list endpoints (list_customers, list_tickets, list_products, search_products) return unbounded result sets. Acceptable for demo data but a pattern gap.",
+      "findingIds": [6]
+    }
+  ],
+  "findings": [
+    {
+      "id": 0,
+      "severity": "HIGH",
+      "lens": "code-review",
+      "category": "validation-gap",
+      "file": "src/tools/products.ts",
+      "line": 36,
+      "description": "search_products uses sanitizeFilterValue (strips ,.()) instead of sanitizeLikeValue (escapes %_\\) for .or() string interpolation. LIKE wildcards % and _ pass through, causing incorrect search results. Input '%' matches entire table.",
+      "suggestion": "Apply both sanitizers: sanitizeLikeValue to escape wildcards, then sanitizeFilterValue to strip PostgREST structural chars. Or compose into a single sanitizeOrFilterValue function."
+    },
+    {
+      "id": 1,
+      "severity": "MEDIUM",
+      "lens": "tests",
+      "category": "test-ineffectiveness",
+      "file": "tests/products.test.ts",
+      "line": null,
+      "description": "Product search tests use a transparent Proxy mock that returns preset results regardless of query construction. Cannot detect the sanitizer bug because the mock never inspects the .or() filter string.",
+      "suggestion": "Add an assertion that verifies the mock was called with the expected sanitized filter string, or add integration tests against a real/local Supabase instance."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "lens": "code-review",
+      "category": "inconsistency",
+      "file": "src/lib/validation.ts",
+      "line": 29,
+      "description": "sanitizeFilterValue and sanitizeLikeValue exist side-by-side but sanitizeFilterValue does not compose sanitizeLikeValue. The .or() interpolation context requires BOTH PostgREST structural char stripping AND LIKE wildcard escaping.",
+      "suggestion": "Create a composable sanitizeOrFilter that applies sanitizeLikeValue first, then strips PostgREST chars. Document the difference in comments."
+    },
+    {
+      "id": 3,
+      "severity": "HIGH",
+      "lens": "error-paths",
+      "category": "silent-failure",
+      "file": "src/lib/supabase.ts",
+      "line": 8,
+      "description": "process.exit(1) at module load and in validateConnection() kills the MCP server process silently. Claude Desktop receives EOF on stdio with no actionable error. Free-tier Supabase auto-pauses after 7 days, making this the likely first experience for a portfolio reviewer.",
+      "suggestion": "Throw an Error instead of calling process.exit. Let the MCP SDK's transport error handling surface a human-readable init failure. Alternatively, use server.onerror or send an MCP error response."
+    },
+    {
+      "id": 4,
+      "severity": "HIGH",
+      "lens": "error-paths",
+      "category": "error-serialization",
+      "file": "src/tools/analytics.ts",
+      "line": 143,
+      "description": "Promise.allSettled rejection reasons are PostgrestError objects. String interpolation via template literal produces '[object Object]' instead of the error message. Pattern: `customers: ${customers.reason}` where reason is an object.",
+      "suggestion": "Use `customers.reason?.message ?? String(customers.reason)` or extract .message before interpolation."
+    },
+    {
+      "id": 5,
+      "severity": "MEDIUM",
+      "lens": "failure-sim",
+      "category": "edge-case",
+      "file": "src/lib/formatters.ts",
+      "line": 1,
+      "description": "formatPrice returns '$NaN' for NaN input and '$Infinity' for Infinity. No guard against non-finite values. aggregateByCategory accumulates without overflow checking.",
+      "suggestion": "Add a guard: if (!Number.isFinite(cents)) return '$0.00' or throw. Low priority for demo context."
+    },
+    {
+      "id": 6,
+      "severity": "MEDIUM",
+      "lens": "stress-scale",
+      "category": "missing-pagination",
+      "file": "src/tools/customers.ts",
+      "line": 30,
+      "description": "list_customers, list_tickets, list_products, search_products all return unbounded result sets via .select('*'). With demo data (20-30 rows) this is fine. With real data, responses could be very large.",
+      "suggestion": "Add .limit(100) default and optional limit/offset params. Low priority for portfolio demo."
+    },
+    {
+      "id": 7,
+      "severity": "MEDIUM",
+      "lens": "concurrency",
+      "category": "race-condition",
+      "file": "src/tools/tickets.ts",
+      "line": 185,
+      "description": "Two concurrent close_ticket calls can both execute UPDATE successfully. The second writer overwrites closed_at and resolution from the first. The atomic .neq filter prevents double-close but not timestamp/resolution corruption from concurrent success.",
+      "suggestion": "Use database-level closed_at default (now()) instead of application-computed timestamp, or add SELECT FOR UPDATE. Low severity for single-user demo."
+    },
+    {
+      "id": 8,
+      "severity": "MEDIUM",
+      "lens": "api-contracts",
+      "category": "semantic-bug",
+      "file": "src/tools/customers.ts",
+      "line": 183,
+      "description": "update_customer with company: '' (empty string) stores '' in the database instead of null. Zod allows empty strings for optional company field. Downstream IS NULL queries stop matching this customer.",
+      "suggestion": "Normalize empty string to null: updates.company = company || null (matching create_customer pattern at line 143)."
+    },
+    {
+      "id": 9,
+      "severity": "MEDIUM",
+      "lens": "config",
+      "category": "version-duplication",
+      "file": "src/server.ts",
+      "line": 12,
+      "description": "Version '0.1.0' hardcoded in server.ts line 12 and package.json line 3. These can drift on version bump.",
+      "suggestion": "Import version from package.json using createRequire or a build-time constant."
+    },
+    {
+      "id": 10,
+      "severity": "MEDIUM",
+      "lens": "stress-scale",
+      "category": "query-fan-out",
+      "file": "src/tools/analytics.ts",
+      "line": 130,
+      "description": "get_summary fires 12 parallel DB queries (3 customer + 6 ticket + 1 product + 2 recent). Each is a separate HTTP request to Supabase. On slow connections this can timeout or hit rate limits.",
+      "suggestion": "Consider using Supabase RPC for a single aggregation query, or add connection pooling awareness. Acceptable for demo."
+    }
+  ],
+  "planAttacks": [
+    {
+      "attack": "The sanitization strategy is split between two functions with no composition, leaving a gap in the most user-facing search tool",
+      "defense": "sanitizeFilterValue targets PostgREST operators specifically for .or() context. The % wildcard issue is real but bounded to product search.",
+      "outcome": "Survived"
+    },
+    {
+      "attack": "process.exit(1) at module scope makes the MCP server hostile to first-time setup, the exact scenario for portfolio reviewers",
+      "defense": "The error messages on stderr are descriptive. But stderr visibility depends on the MCP host implementation.",
+      "outcome": "Survived"
+    },
+    {
+      "attack": "Mock-based tests give false confidence because they cannot detect query construction bugs",
+      "defense": "Integration tests via InMemoryTransport test the MCP protocol layer correctly. The gap is specifically in the Supabase query builder layer.",
+      "outcome": "Survived"
+    },
+    {
+      "attack": "No pagination means a single SELECT * could return megabytes of data",
+      "defense": "Demo dataset is 60 rows. No realistic path to large data in the intended deployment.",
+      "outcome": "Deflected"
+    }
+  ],
+  "debateVerdict": "CAUTION",
+  "overallVerdict": "CAUTION",
+  "summary": {
+    "critical": 0,
+    "high": 3,
+    "medium": 8,
+    "clusters": 3,
+    "passed": false
+  }
+}

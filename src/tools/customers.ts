@@ -181,7 +181,7 @@ export function registerCustomerTools(server: McpServer): void {
 			const updates: Record<string, unknown> = {};
 			if (name !== undefined) updates.name = name;
 			if (email !== undefined) updates.email = email;
-			if (company !== undefined) updates.company = company;
+			if (company !== undefined) updates.company = company || null;
 			if (status !== undefined) updates.status = status;
 
 			if (Object.keys(updates).length === 0) {

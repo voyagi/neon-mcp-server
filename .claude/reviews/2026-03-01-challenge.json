@@ -1,0 +1,216 @@
+{
+  "reviewedAt": "2026-03-01T16:08:00.000Z",
+  "target": "project (all 13 source files, 10 test files)",
+  "targetType": "code",
+  "lensesApplied": [
+    "adversarial-code-review",
+    "logic-trace",
+    "error-path-audit",
+    "concurrency-review",
+    "regression-analysis",
+    "plan-critique",
+    "assumption-surfacing",
+    "integration-review",
+    "api-contract-review",
+    "failure-simulation",
+    "stress-scale-review",
+    "configuration-review",
+    "dependency-audit",
+    "multi-agent-debate",
+    "devils-advocate",
+    "test-generation"
+  ],
+  "rootCauseClusters": [
+    {
+      "name": "Unguarded data[0] Access Pattern",
+      "severity": "HIGH",
+      "description": "After .insert().select() or .update().select(), code accesses data[0] without checking array length. Empty arrays from RLS or row deletion produce undefined, breaking JSON serialization.",
+      "findingIds": [0, 1, 2]
+    },
+    {
+      "name": "Incomplete PostgREST Sanitization",
+      "severity": "HIGH",
+      "description": "sanitizeFilterValue strips commas and parentheses but not periods, which are structural in PostgREST field.op.value syntax. User input with periods corrupts .or() filters.",
+      "findingIds": [3, 4]
+    },
+    {
+      "name": "Error Type Conflation",
+      "severity": "HIGH",
+      "description": "Some handlers collapse all error types into a single response path. DB connection failures appear as 'not found' to users, and single-query failures discard results from successful parallel queries.",
+      "findingIds": [5, 6]
+    }
+  ],
+  "findings": [
+    {
+      "id": 0,
+      "severity": "HIGH",
+      "lens": "adversarial-code-review",
+      "category": "null-safety",
+      "file": "src/tools/customers.ts",
+      "line": 156,
+      "description": "create_customer accesses data[0] without checking if data is a non-empty array. If Supabase returns empty array (e.g. RLS blocks read-back), jsonResponse(undefined) produces malformed MCP response.",
+      "suggestion": "Add guard: if (!data || data.length === 0) return textResponse('Customer created but could not be retrieved'); before accessing data[0]."
+    },
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "lens": "adversarial-code-review",
+      "category": "null-safety",
+      "file": "src/tools/tickets.ts",
+      "line": 154,
+      "description": "create_ticket accesses data[0] without null check. Same RLS/empty-array vulnerability as create_customer.",
+      "suggestion": "Add same guard as create_customer before data[0] access."
+    },
+    {
+      "id": 2,
+      "severity": "HIGH",
+      "lens": "logic-trace",
+      "category": "null-safety",
+      "file": "src/tools/tickets.ts",
+      "line": 199,
+      "description": "close_ticket accesses data[0] after update without checking array length. Row deleted between read and write (e.g. customer cascade delete) produces undefined.",
+      "suggestion": "Add guard: if (!data || data.length === 0) return notFoundResponse('Ticket', id); before data[0] access."
+    },
+    {
+      "id": 3,
+      "severity": "HIGH",
+      "lens": "adversarial-code-review",
+      "category": "injection",
+      "file": "src/lib/validation.ts",
+      "line": 30,
+      "description": "sanitizeFilterValue does not strip period character. PostgREST uses periods as field.op.value delimiters. Input containing periods (e.g. 'v2.0') corrupts .or() filter syntax.",
+      "suggestion": "Add period to the regex: return value.replace(/[,.()]/g, '');"
+    },
+    {
+      "id": 4,
+      "severity": "HIGH",
+      "lens": "failure-simulation",
+      "category": "injection",
+      "file": "src/tools/products.ts",
+      "line": 42,
+      "description": "search_products interpolates sanitized user input into PostgREST .or() filter. With periods intact, inputs like 'v2.0' or 'Pro.' produce malformed filter strings that return 400 errors from PostgREST.",
+      "suggestion": "Strip periods in sanitizeFilterValue, or switch to individual .ilike() calls chained with .or() operator instead of string interpolation."
+    },
+    {
+      "id": 5,
+      "severity": "HIGH",
+      "lens": "error-path-audit",
+      "category": "error-handling",
+      "file": "src/tools/tickets.ts",
+      "line": 101,
+      "description": "get_ticket uses 'if (error || !data)' which conflates DB errors (connection timeout, auth failure) with not-found. Returns misleading 'Ticket not found' for any error type.",
+      "suggestion": "Check error.code === PGRST_NOT_FOUND for not-found, return dbErrorResponse(error) for all other errors. Match the pattern used in get_customer."
+    },
+    {
+      "id": 6,
+      "severity": "MEDIUM",
+      "lens": "error-path-audit",
+      "category": "error-handling",
+      "file": "src/tools/analytics.ts",
+      "line": 23,
+      "description": "countWhere throws on error, which causes Promise.all to reject immediately, discarding results from all other successful parallel queries. One failed count kills the entire summary.",
+      "suggestion": "Have countWhere return a Result type instead of throwing, or use Promise.allSettled and include partial results."
+    },
+    {
+      "id": 7,
+      "severity": "MEDIUM",
+      "lens": "concurrency-review",
+      "category": "race-condition",
+      "file": "src/tools/tickets.ts",
+      "line": 169,
+      "description": "close_ticket has TOCTOU: reads status, checks if closed, then updates in separate query. Two concurrent calls both pass the check and both execute the update, overwriting closed_at timestamp.",
+      "suggestion": "Use conditional update: .update({...}).eq('id', id).neq('status', 'closed').select(), then check if data is empty (meaning already closed)."
+    },
+    {
+      "id": 8,
+      "severity": "MEDIUM",
+      "lens": "api-contract-review",
+      "category": "scalability",
+      "file": "src/tools/customers.ts",
+      "line": 30,
+      "description": "list_customers returns all matching rows with no LIMIT. Also applies to list_tickets, list_products, search_products. With thousands of records, responses exceed practical size limits.",
+      "suggestion": "Add optional limit parameter (default 100) and offset for pagination."
+    },
+    {
+      "id": 9,
+      "severity": "MEDIUM",
+      "lens": "stress-scale-review",
+      "category": "performance",
+      "file": "src/tools/products.ts",
+      "line": 41,
+      "description": "search_products uses ILIKE on three columns (name, category, description) without indexes. Full table scan on large datasets.",
+      "suggestion": "Add GIN indexes on searchable text columns, or use Supabase full-text search."
+    },
+    {
+      "id": 10,
+      "severity": "MEDIUM",
+      "lens": "adversarial-code-review",
+      "category": "correctness",
+      "file": "src/lib/formatters.ts",
+      "line": 27,
+      "description": "formatTicketListItem uses || instead of ?? for customer name fallback. Empty string customer name gets replaced with 'Unknown Customer' instead of showing the empty string.",
+      "suggestion": "Change to: customer_name: customers?.name ?? 'Unknown Customer'"
+    },
+    {
+      "id": 11,
+      "severity": "MEDIUM",
+      "lens": "integration-review",
+      "category": "coupling",
+      "file": "src/resources/schema.ts",
+      "line": 56,
+      "description": "Schema resource is a hardcoded static definition. If the actual DB schema diverges (migration without code update), Claude receives incorrect schema info and generates wrong queries.",
+      "suggestion": "Add a comment documenting this is intentionally static for the demo. For production, query information_schema."
+    },
+    {
+      "id": 12,
+      "severity": "MEDIUM",
+      "lens": "stress-scale-review",
+      "category": "performance",
+      "file": "src/tools/analytics.ts",
+      "line": 131,
+      "description": "get_summary fires 12 separate count queries to Supabase. On cold-start free-tier projects, all 12 hit simultaneously, risking rate limits and connection pool exhaustion.",
+      "suggestion": "Consider using a single Supabase RPC (PostgreSQL function) that returns all counts in one query."
+    },
+    {
+      "id": 13,
+      "severity": "MEDIUM",
+      "lens": "concurrency-review",
+      "category": "race-condition",
+      "file": "src/tools/tickets.ts",
+      "line": 131,
+      "description": "create_ticket validates customer existence then inserts ticket. If customer is deleted between validation and insert, FK violation produces a generic DB error instead of a helpful message.",
+      "suggestion": "Catch FK violation error code (23503) and return a specific 'customer was deleted' message."
+    }
+  ],
+  "planAttacks": [
+    {
+      "attack": "No authentication layer - any connected client has full read/write access via service role key.",
+      "defense": "MCP servers run locally via stdio. No network exposure. Service role is necessary for full DB access.",
+      "outcome": "Deflected"
+    },
+    {
+      "attack": "No rate limiting - a buggy AI agent could spam write operations.",
+      "defense": "MCP stdio transport is serialized. Claude Desktop won't spam requests.",
+      "outcome": "Deflected"
+    },
+    {
+      "attack": "Single-table seed script with no migration tooling - schema changes require manual SQL.",
+      "defense": "Fixed demo with known schema. Migrations add complexity for zero benefit here.",
+      "outcome": "Deflected"
+    },
+    {
+      "attack": "Service role key gives full access. Compromised Claude Desktop could exfiltrate or destroy all data.",
+      "defense": "True for production. Would need RLS policies and scoped tokens.",
+      "outcome": "Survived"
+    }
+  ],
+  "debateVerdict": "CAUTION",
+  "overallVerdict": "CAUTION",
+  "summary": {
+    "critical": 0,
+    "high": 6,
+    "medium": 8,
+    "clusters": 3,
+    "passed": false
+  }
+}

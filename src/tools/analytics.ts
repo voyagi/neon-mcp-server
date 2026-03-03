@@ -140,17 +140,29 @@ export function registerAnalyticsTools(server: McpServer): void {
 			const errors: string[] = [];
 
 			if (customers.status === "fulfilled") summary.customers = customers.value;
-			else errors.push(`customers: ${customers.reason}`);
+			else
+				errors.push(
+					`customers: ${customers.reason?.message ?? String(customers.reason)}`,
+				);
 
 			if (tickets.status === "fulfilled") summary.tickets = tickets.value;
-			else errors.push(`tickets: ${tickets.reason}`);
+			else
+				errors.push(
+					`tickets: ${tickets.reason?.message ?? String(tickets.reason)}`,
+				);
 
 			if (products.status === "fulfilled") summary.products = products.value;
-			else errors.push(`products: ${products.reason}`);
+			else
+				errors.push(
+					`products: ${products.reason?.message ?? String(products.reason)}`,
+				);
 
 			if (recentActivity.status === "fulfilled")
 				summary.recent_activity = recentActivity.value;
-			else errors.push(`recent_activity: ${recentActivity.reason}`);
+			else
+				errors.push(
+					`recent_activity: ${recentActivity.reason?.message ?? String(recentActivity.reason)}`,
+				);
 
 			if (Object.keys(summary).length === 0) {
 				return textResponse(`Error fetching summary: ${errors.join("; ")}`);
