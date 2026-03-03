@@ -204,7 +204,13 @@ export function registerTicketTools(server: McpServer): void {
 					.eq("id", id)
 					.single();
 
-				if (checkError || !check) {
+				if (checkError) {
+					if (checkError.code === PGRST_NOT_FOUND) {
+						return notFoundResponse("Ticket", id);
+					}
+					return dbErrorResponse(checkError);
+				}
+				if (!check) {
 					return notFoundResponse("Ticket", id);
 				}
 				if (check.status === "closed") {

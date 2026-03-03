@@ -20,7 +20,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Validates database connection by running a test query.
- * Exits process if connection fails.
+ * Throws if connection fails.
  */
 export async function validateConnection(): Promise<void> {
 	try {

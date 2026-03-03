@@ -253,6 +253,8 @@ describe("get_summary", () => {
 		expect(parsed.tickets.total).toBe(8);
 		expect(parsed.products.total_value).toBe("$10.00");
 		expect(parsed.recent_activity.customers_created_this_week).toBe(1);
+		expect(Array.isArray(parsed.errors)).toBe(true);
+		expect(parsed.errors[0]).toContain("customers");
 	});
 });
 
