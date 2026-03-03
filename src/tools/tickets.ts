@@ -5,6 +5,7 @@ import {
 	resolveOneCustomer,
 	validateCustomerExists,
 } from "../lib/customers.js";
+import { PG_FK_VIOLATION, PGRST_NOT_FOUND } from "../lib/errors.js";
 import {
 	formatTicketListItem,
 	formatTicketWithCustomer,
@@ -98,7 +99,13 @@ export function registerTicketTools(server: McpServer): void {
 				.eq("id", id)
 				.single();
 
-			if (error || !data) {
+			if (error) {
+				if (error.code === PGRST_NOT_FOUND) {
+					return notFoundResponse("Ticket", id);
+				}
+				return dbErrorResponse(error);
+			}
+			if (!data) {
 				return notFoundResponse("Ticket", id);
 			}
 
@@ -148,7 +155,16 @@ export function registerTicketTools(server: McpServer): void {
 				.select();
 
 			if (error) {
+				if (error.code === PG_FK_VIOLATION) {
+					return textResponse(
+						"Cannot create ticket: the linked customer no longer exists",
+					);
+				}
 				return dbErrorResponse(error);
+			}
+
+			if (!data || data.length === 0) {
+				return textResponse("Ticket created but could not be retrieved");
 			}
 
 			return jsonResponse(data[0]);
@@ -166,22 +182,6 @@ export function registerTicketTools(server: McpServer): void {
 		async (args) => {
 			const { id, resolution } = args;
 
-			const { data: existing, error: fetchError } = await supabase
-				.from("tickets")
-				.select("status, closed_at")
-				.eq("id", id)
-				.single();
-
-			if (fetchError || !existing) {
-				return notFoundResponse("Ticket", id);
-			}
-
-			if (existing.status === "closed") {
-				return textResponse(
-					`Ticket ${id} is already closed (closed on ${existing.closed_at})`,
-				);
-			}
-
 			const { data, error } = await supabase
 				.from("tickets")
 				.update({
@@ -190,10 +190,35 @@ export function registerTicketTools(server: McpServer): void {
 					resolution: resolution || null,
 				})
 				.eq("id", id)
+				.neq("status", "closed")
 				.select();
 
 			if (error) {
 				return dbErrorResponse(error);
+			}
+
+			if (!data || data.length === 0) {
+				const { data: check, error: checkError } = await supabase
+					.from("tickets")
+					.select("status, closed_at")
+					.eq("id", id)
+					.single();
+
+				if (checkError) {
+					if (checkError.code === PGRST_NOT_FOUND) {
+						return notFoundResponse("Ticket", id);
+					}
+					return dbErrorResponse(checkError);
+				}
+				if (!check) {
+					return notFoundResponse("Ticket", id);
+				}
+				if (check.status === "closed") {
+					return textResponse(
+						`Ticket ${id} is already closed (closed on ${check.closed_at})`,
+					);
+				}
+				return notFoundResponse("Ticket", id);
 			}
 
 			return jsonResponse(data[0]);

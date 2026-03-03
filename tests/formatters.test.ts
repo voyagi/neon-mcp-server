@@ -95,6 +95,17 @@ describe("formatTicketListItem", () => {
 		const result = formatTicketListItem(ticket);
 		expect(result.customer_name).toBe("Unknown Customer");
 	});
+
+	it("preserves empty string name instead of falling back", () => {
+		const ticket = {
+			id: "t1",
+			subject: "Bug",
+			customers: { name: "" },
+		};
+
+		const result = formatTicketListItem(ticket);
+		expect(result.customer_name).toBe("");
+	});
 });
 
 describe("formatTicketWithCustomer", () => {

@@ -53,6 +53,8 @@ interface DatabaseSchema {
 	tables: SchemaTable[];
 }
 
+// Schema is intentionally defined as static TypeScript for this demo.
+// If the database schema changes, update these definitions manually.
 const customersTable: SchemaTable = {
 	name: "customers",
 	description: "Customer records for the business",

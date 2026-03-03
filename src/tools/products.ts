@@ -3,7 +3,7 @@ import { z } from "zod";
 import { formatProduct } from "../lib/formatters.js";
 import { dbErrorResponse, listResponse } from "../lib/responses.js";
 import { supabase } from "../lib/supabase.js";
-import { sanitizeFilterValue } from "../lib/validation.js";
+import { sanitizeFilterValue, sanitizeLikeValue } from "../lib/validation.js";
 
 export function registerProductTools(server: McpServer): void {
 	// list_products tool
@@ -33,7 +33,7 @@ export function registerProductTools(server: McpServer): void {
 			query: z.string().min(1, { error: "Search query is required" }),
 		},
 		async (args) => {
-			const safe = sanitizeFilterValue(args.query);
+			const safe = sanitizeFilterValue(sanitizeLikeValue(args.query));
 
 			const { data, error } = await supabase
 				.from("products")

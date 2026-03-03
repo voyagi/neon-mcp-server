@@ -24,7 +24,7 @@ export function formatTicketListItem(ticket: {
 	const { customers, ...rest } = ticket;
 	return {
 		...rest,
-		customer_name: customers?.name || "Unknown Customer",
+		customer_name: customers?.name ?? "Unknown Customer",
 	};
 }
 

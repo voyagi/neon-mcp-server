@@ -27,7 +27,7 @@ export function uuidParam(label: string) {
 // Strip characters that are structural in PostgREST filter syntax
 // to prevent filter injection when interpolating into .or() strings
 export function sanitizeFilterValue(value: string): string {
-	return value.replace(/[,()]/g, "");
+	return value.replace(/[,.()]/g, "");
 }
 
 // Escape LIKE/ILIKE wildcards so user input is matched literally

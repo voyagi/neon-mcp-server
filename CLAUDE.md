@@ -156,7 +156,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "techstart-crm": {
       "command": "node",
-      "args": ["C:/Users/Eagi/upwork-mcp-server/dist/index.js"],
+      "args": ["C:/Users/Eagi/projects/upwork-mcp-server/dist/index.js"],
       "env": {
         "SUPABASE_URL": "https://your-project.supabase.co",
         "SUPABASE_SECRET_KEY": "eyJ..."

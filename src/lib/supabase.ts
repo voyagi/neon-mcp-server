@@ -2,17 +2,15 @@ import { createClient } from "@supabase/supabase-js";
 
 // Validate required environment variables at module load
 if (!process.env.SUPABASE_URL) {
-	console.error(
+	throw new Error(
 		"Missing required environment variable: SUPABASE_URL. See README.md for configuration instructions.",
 	);
-	process.exit(1);
 }
 
 if (!process.env.SUPABASE_SECRET_KEY) {
-	console.error(
+	throw new Error(
 		"Missing required environment variable: SUPABASE_SECRET_KEY. See README.md for configuration instructions.",
 	);
-	process.exit(1);
 }
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -22,7 +20,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Validates database connection by running a test query.
- * Exits process if connection fails.
+ * Throws if connection fails.
  */
 export async function validateConnection(): Promise<void> {
 	try {
@@ -34,9 +32,8 @@ export async function validateConnection(): Promise<void> {
 
 		console.error("Supabase connection verified");
 	} catch {
-		console.error(
+		throw new Error(
 			"Failed to connect to Supabase database. Verify SUPABASE_URL and SUPABASE_SECRET_KEY are correct. If tables are missing, run the seed script — see README.md.",
 		);
-		process.exit(1);
 	}
 }
