@@ -1,8 +1,1 @@
-# Enforce LF line endings for source files
-*.ts eol=lf
-*.js eol=lf
-*.json eol=lf
-*.md eol=lf
-*.sql eol=lf
-*.yml eol=lf
-*.yaml eol=lf
+* text=auto eol=lf
