@@ -1,9 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { sql } from "../lib/db.js";
 import { formatProduct } from "../lib/formatters.js";
 import { dbErrorResponse, listResponse } from "../lib/responses.js";
-import { supabase } from "../lib/supabase.js";
-import { sanitizeFilterValue, sanitizeLikeValue } from "../lib/validation.js";
+import { sanitizeLikeValue } from "../lib/validation.js";
 
 export function registerProductTools(server: McpServer): void {
 	// list_products tool
@@ -12,16 +12,16 @@ export function registerProductTools(server: McpServer): void {
 		"List all products with pricing information",
 		{},
 		async () => {
-			const { data, error } = await supabase
-				.from("products")
-				.select("*")
-				.order("name", { ascending: true });
-
-			if (error) {
+			try {
+				const rows = await sql`SELECT * FROM products ORDER BY name`;
+				return listResponse(
+					rows.map((row) =>
+						formatProduct(row as Parameters<typeof formatProduct>[0]),
+					),
+				);
+			} catch (error) {
 				return dbErrorResponse(error);
 			}
-
-			return listResponse((data || []).map(formatProduct));
 		},
 	);
 
@@ -33,24 +33,25 @@ export function registerProductTools(server: McpServer): void {
 			query: z.string().min(1, { error: "Search query is required" }),
 		},
 		async (args) => {
-			const safe = sanitizeFilterValue(sanitizeLikeValue(args.query));
+			const pattern = `%${sanitizeLikeValue(args.query)}%`;
 
-			const { data, error } = await supabase
-				.from("products")
-				.select("*")
-				.or(
-					`name.ilike.%${safe}%,category.ilike.%${safe}%,description.ilike.%${safe}%`,
-				)
-				.order("name", { ascending: true });
+			try {
+				const rows = await sql`
+					SELECT * FROM products
+					WHERE name ILIKE ${pattern}
+						OR category ILIKE ${pattern}
+						OR description ILIKE ${pattern}
+					ORDER BY name`;
 
-			if (error) {
+				return listResponse(
+					rows.map((row) =>
+						formatProduct(row as Parameters<typeof formatProduct>[0]),
+					),
+					`No products match "${args.query}"`,
+				);
+			} catch (error) {
 				return dbErrorResponse(error);
 			}
-
-			return listResponse(
-				(data || []).map(formatProduct),
-				`No products match "${args.query}"`,
-			);
 		},
 	);
 }

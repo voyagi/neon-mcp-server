@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	createSupabaseMock,
+	createDbMock,
 	getToolJson,
 	getToolText,
-	mockQuery,
-} from "./helpers/mock-supabase.js";
+	pgError,
+} from "./helpers/mock-db.js";
 
-vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
+vi.mock("../src/lib/db.js", () => createDbMock());
 
-import { supabase } from "../src/lib/supabase.js";
+import { query, sql } from "../src/lib/db.js";
 import { createServer } from "../src/server.js";
 
-const mockedFrom = vi.mocked(supabase.from);
+const mockedSql = vi.mocked(sql);
+const mockedQuery = vi.mocked(query);
 
-// Call a tool on the server by creating a connected client
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
@@ -37,9 +37,7 @@ describe("list_customers", () => {
 			{ id: "1", name: "Alice", email: "a@test.com", status: "active" },
 			{ id: "2", name: "Bob", email: "b@test.com", status: "lead" },
 		];
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: customers, error: null }),
-		);
+		mockedQuery.mockResolvedValueOnce(customers);
 
 		const result = await client.callTool({
 			name: "list_customers",
@@ -49,11 +47,11 @@ describe("list_customers", () => {
 		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(2);
 		expect(parsed.results).toHaveLength(2);
-		expect(parsed.results[0].name).toBe("Alice");
+		expect((parsed.results as { name: string }[])[0].name).toBe("Alice");
 	});
 
 	it("returns empty results message when none match", async () => {
-		mockedFrom.mockReturnValue(mockQuery({ data: [], error: null }));
+		mockedQuery.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "list_customers",
@@ -66,9 +64,7 @@ describe("list_customers", () => {
 	});
 
 	it("returns error on database failure", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: null, error: { message: "connection lost" } }),
-		);
+		mockedQuery.mockRejectedValueOnce(new Error("connection lost"));
 
 		const result = await client.callTool({
 			name: "list_customers",
@@ -90,19 +86,13 @@ describe("get_customer", () => {
 			status: "active",
 		};
 
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: customer, error: null }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 5 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 2 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: [{ subject: "Test", status: "open", created_at: "2026-01-01" }], error: null }),
-			);
+		mockedSql
+			.mockResolvedValueOnce([customer])
+			.mockResolvedValueOnce([{ count: 5 }])
+			.mockResolvedValueOnce([{ count: 2 }])
+			.mockResolvedValueOnce([
+				{ subject: "Test", status: "open", created_at: "2026-01-01" },
+			]);
 
 		const result = await client.callTool({
 			name: "get_customer",
@@ -115,13 +105,8 @@ describe("get_customer", () => {
 		expect(parsed.open_tickets_count).toBe(2);
 	});
 
-	it("returns not found for PGRST116 error", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: null,
-				error: { message: "not found", code: "PGRST116" },
-			}),
-		);
+	it("returns not found for missing customer", async () => {
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "get_customer",
@@ -132,13 +117,8 @@ describe("get_customer", () => {
 		expect(text).toContain("not found");
 	});
 
-	it("returns database error for non-PGRST116 errors", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: null,
-				error: { message: "connection timeout", code: "PGRST000" },
-			}),
-		);
+	it("returns database error on query failure", async () => {
+		mockedSql.mockRejectedValueOnce(new Error("connection timeout"));
 
 		const result = await client.callTool({
 			name: "get_customer",
@@ -159,9 +139,7 @@ describe("create_customer", () => {
 			email: "c@test.com",
 			status: "active",
 		};
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: [newCustomer], error: null }),
-		);
+		mockedSql.mockResolvedValueOnce([newCustomer]);
 
 		const result = await client.callTool({
 			name: "create_customer",
@@ -173,12 +151,7 @@ describe("create_customer", () => {
 	});
 
 	it("handles duplicate email", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: null,
-				error: { message: "duplicate key", code: "23505" },
-			}),
-		);
+		mockedSql.mockRejectedValueOnce(pgError("duplicate key", "23505"));
 
 		const result = await client.callTool({
 			name: "create_customer",
@@ -190,9 +163,7 @@ describe("create_customer", () => {
 	});
 
 	it("handles empty data array from insert", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: [], error: null }),
-		);
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "create_customer",
@@ -212,9 +183,7 @@ describe("update_customer", () => {
 			email: "a@test.com",
 			status: "active",
 		};
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: [updated], error: null }),
-		);
+		mockedQuery.mockResolvedValueOnce([updated]);
 
 		const result = await client.callTool({
 			name: "update_customer",

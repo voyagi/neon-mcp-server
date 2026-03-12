@@ -1,17 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	createSupabaseMock,
-	getToolJson,
-	getToolText,
-	mockQuery,
-} from "./helpers/mock-supabase.js";
+import { createDbMock, getToolJson, getToolText } from "./helpers/mock-db.js";
 
-vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
+vi.mock("../src/lib/db.js", () => createDbMock());
 
-import { supabase } from "../src/lib/supabase.js";
+import { sql } from "../src/lib/db.js";
 import { createServer } from "../src/server.js";
 
-const mockedFrom = vi.mocked(supabase.from);
+const mockedSql = vi.mocked(sql);
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -42,7 +37,7 @@ describe("list_products", () => {
 				created_at: "2026-01-01",
 			},
 		];
-		mockedFrom.mockReturnValue(mockQuery({ data: products, error: null }));
+		mockedSql.mockResolvedValueOnce(products);
 
 		const result = await client.callTool({
 			name: "list_products",
@@ -51,14 +46,13 @@ describe("list_products", () => {
 
 		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(1);
-		expect(parsed.results[0].price_display).toBe("$49.00");
-		expect(parsed.results[0].price_cents).toBe(4900);
+		const first = (parsed.results as Record<string, unknown>[])[0];
+		expect(first.price_display).toBe("$49.00");
+		expect(first.price_cents).toBe(4900);
 	});
 
 	it("handles database error", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: null, error: { message: "timeout" } }),
-		);
+		mockedSql.mockRejectedValueOnce(new Error("timeout"));
 
 		const result = await client.callTool({
 			name: "list_products",
@@ -82,7 +76,7 @@ describe("search_products", () => {
 				created_at: "2026-01-01",
 			},
 		];
-		mockedFrom.mockReturnValue(mockQuery({ data: products, error: null }));
+		mockedSql.mockResolvedValueOnce(products);
 
 		const result = await client.callTool({
 			name: "search_products",
@@ -91,12 +85,13 @@ describe("search_products", () => {
 
 		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(1);
-		expect(parsed.results[0].name).toBe("Enterprise Plan");
-		expect(parsed.results[0].price_display).toBe("$499.00");
+		const first = (parsed.results as Record<string, unknown>[])[0];
+		expect(first.name).toBe("Enterprise Plan");
+		expect(first.price_display).toBe("$499.00");
 	});
 
 	it("returns empty with message when no matches", async () => {
-		mockedFrom.mockReturnValue(mockQuery({ data: [], error: null }));
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "search_products",
@@ -108,8 +103,8 @@ describe("search_products", () => {
 		expect(parsed.message).toContain("nonexistent");
 	});
 
-	it("strips periods from search query to prevent filter injection", async () => {
-		mockedFrom.mockReturnValue(mockQuery({ data: [], error: null }));
+	it("safely handles query with special characters", async () => {
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "search_products",

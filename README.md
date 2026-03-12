@@ -10,7 +10,7 @@
 ```mermaid
 graph LR
     A["Claude Desktop / Code"] -- "stdio" --> B["MCP Server<br/>(Node.js + TypeScript)"]
-    B -- "Supabase JS Client" --> C["PostgreSQL<br/>(Supabase)"]
+    B -- "Neon Serverless Driver" --> C["PostgreSQL<br/>(Neon)"]
     C -- "query results" --> B
     B -- "tool responses" --> A
 
@@ -19,7 +19,7 @@ graph LR
     style C fill:#22c55e,stroke:#16a34a,color:#fff
 ```
 
-Claude communicates with the MCP server over stdio. The server translates natural language tool calls into Supabase queries and returns structured results that Claude interprets for the user.
+Claude communicates with the MCP server over stdio. The server translates natural language tool calls into parameterized SQL queries via the Neon serverless driver and returns structured results that Claude interprets for the user.
 
 ---
 
@@ -68,7 +68,7 @@ Claude communicates with the MCP server over stdio. The server translates natura
 
 - **Runtime:** Node.js + TypeScript
 - **MCP SDK:** @modelcontextprotocol/sdk
-- **Database:** Supabase (PostgreSQL)
+- **Database:** Neon Postgres (@neondatabase/serverless)
 - **Validation:** Zod
 - **Linter/Formatter:** Biome
 - **Transport:** stdio
@@ -85,46 +85,9 @@ cd upwork-mcp-server
 npm install
 ```
 
-### 2. Create a Supabase project
+### 2. Create a Neon database
 
-Go to [supabase.com](https://supabase.com) and create a new project. Open the **SQL Editor** and run the following to create the tables:
-
-```sql
-create table customers (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  email text not null unique,
-  company text,
-  status text not null default 'active'
-    check (status in ('active', 'inactive', 'lead')),
-  created_at timestamptz default now()
-);
-
-create table products (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  category text not null,
-  price_cents integer not null,
-  description text,
-  created_at timestamptz default now()
-);
-
-create table tickets (
-  id uuid primary key default gen_random_uuid(),
-  customer_id uuid references customers(id) on delete cascade,
-  subject text not null,
-  description text,
-  status text not null default 'open'
-    check (status in ('open', 'in_progress', 'closed')),
-  priority text not null default 'medium'
-    check (priority in ('low', 'medium', 'high', 'urgent')),
-  resolution text,
-  created_at timestamptz default now(),
-  closed_at timestamptz
-);
-```
-
-Then run the contents of `seed/seed.sql` to populate the database with 22 customers, 12 products, and 32 support tickets.
+Go to [neon.tech](https://neon.tech) and create a new project. Copy the connection string from the **Connection Details** panel.
 
 ### 3. Configure environment
 
@@ -132,15 +95,22 @@ Then run the contents of `seed/seed.sql` to populate the database with 22 custom
 cp .env.example .env
 ```
 
-Fill in your Supabase credentials from the **Connect dialog** (or Project Settings > API Keys):
+Fill in your Neon connection string:
 
-- `SUPABASE_URL` — your project URL (e.g., `https://abcdefg.supabase.co`)
-- `SUPABASE_SECRET_KEY` — the service role key (not the anon key)
+- `DATABASE_URL` — your Neon Postgres connection string (e.g., `postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`)
 
-### 4. Build and run
+### 4. Create tables and seed data
 
 ```bash
 npm run build
+node seed/run-seed.mjs
+```
+
+This creates the tables and populates the database with 22 customers, 12 products, and 32 support tickets.
+
+### 5. Run
+
+```bash
 npm start
 ```
 
@@ -162,15 +132,14 @@ Add the following to your Claude Desktop config file:
       "command": "node",
       "args": ["/absolute/path/to/upwork-mcp-server/dist/index.js"],
       "env": {
-        "SUPABASE_URL": "https://your-project-id.supabase.co",
-        "SUPABASE_SECRET_KEY": "your-service-role-key-here"
+        "DATABASE_URL": "postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
       }
     }
   }
 }
 ```
 
-Replace `/absolute/path/to/upwork-mcp-server` with the actual path where you cloned the repository, and fill in your Supabase credentials.
+Replace `/absolute/path/to/upwork-mcp-server` with the actual path where you cloned the repository, and fill in your Neon connection string.
 
 ---
 
@@ -310,25 +279,27 @@ The test suite covers:
 - **Response helpers** - MCP response formatting utilities
 - **Formatters** - price and product display formatting
 
-All tool tests use `InMemoryTransport` for full MCP client/server integration testing with a mocked Supabase backend, so no database connection is needed.
+All tool tests use `InMemoryTransport` for full MCP client/server integration testing with a mocked database backend, so no database connection is needed.
+
+### E2E Testing
+
+```bash
+node seed/e2e-test.mjs   # 14 tests against live Neon database
+```
 
 ## Troubleshooting
 
-**"Missing required environment variable: SUPABASE_URL"**
-You haven't created the `.env` file. Copy `.env.example` to `.env` and fill in your Supabase credentials.
+**"Missing required environment variable: DATABASE_URL"**
+You haven't created the `.env` file. Copy `.env.example` to `.env` and fill in your Neon connection string.
 
-**"Failed to connect to Supabase database"**
-The server starts but can't reach Supabase. Check that:
+**"Failed to connect to database"**
+The server starts but can't reach Neon. Check that:
 
-- `SUPABASE_URL` is your full project URL (e.g., `https://abcdefg.supabase.co`)
-- `SUPABASE_SECRET_KEY` is the **service role** key, not the anon key
-- Your Supabase project is active (free-tier projects pause after inactivity)
+- `DATABASE_URL` is your full Neon connection string (e.g., `postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`)
+- Your Neon project is active (free-tier projects suspend after inactivity but wake automatically on connection)
 
 **"relation customers does not exist" or similar**
-The database tables haven't been created. Run the SQL schema from the Setup section in the Supabase SQL Editor, then run `seed/seed.sql` to populate demo data.
-
-**"permission denied for table customers"**
-You're using the anon key instead of the service role key. Go to Project Settings > API in your Supabase dashboard and copy the `service_role` key (not `anon`).
+The database tables haven't been created. Run `node seed/run-seed.mjs` to create tables and seed demo data.
 
 **Server starts but Claude doesn't see the tools**
 Verify the path in `claude_desktop_config.json` points to the compiled `dist/index.js` (not `src/index.ts`). Run `npm run build` first if you haven't.

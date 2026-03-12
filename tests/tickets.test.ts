@@ -1,17 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	createSupabaseMock,
+	createDbMock,
 	getToolJson,
 	getToolText,
-	mockQuery,
-} from "./helpers/mock-supabase.js";
+	pgError,
+} from "./helpers/mock-db.js";
 
-vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
+vi.mock("../src/lib/db.js", () => createDbMock());
 
-import { supabase } from "../src/lib/supabase.js";
+import { query, sql } from "../src/lib/db.js";
 import { createServer } from "../src/server.js";
 
-const mockedFrom = vi.mocked(supabase.from);
+const mockedSql = vi.mocked(sql);
+const mockedQuery = vi.mocked(query);
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -38,10 +39,10 @@ describe("list_tickets", () => {
 				subject: "Bug report",
 				status: "open",
 				priority: "high",
-				customers: { name: "Alice" },
+				customer_name: "Alice",
 			},
 		];
-		mockedFrom.mockReturnValue(mockQuery({ data: tickets, error: null }));
+		mockedQuery.mockResolvedValueOnce(tickets);
 
 		const result = await client.callTool({
 			name: "list_tickets",
@@ -50,33 +51,25 @@ describe("list_tickets", () => {
 
 		const parsed = getToolJson(result);
 		expect(parsed.count).toBe(1);
-		expect(parsed.results[0].customer_name).toBe("Alice");
+		expect(
+			(parsed.results as { customer_name: string }[])[0].customer_name,
+		).toBe("Alice");
 	});
 
 	it("resolves customer by name before querying tickets", async () => {
-		// First call: findCustomersByName
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: [{ id: "c1", name: "Alice Chen" }],
-				error: null,
-			}),
-		);
-		// Second call: ticket query
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: [
-					{
-						id: "t1",
-						subject: "Help",
-						status: "open",
-						priority: "medium",
-						customer_id: "c1",
-						customers: { name: "Alice Chen" },
-					},
-				],
-				error: null,
-			}),
-		);
+		// First call: findCustomersByName (tagged template)
+		mockedSql.mockResolvedValueOnce([{ id: "c1", name: "Alice Chen" }]);
+		// Second call: ticket query (dynamic SQL via query())
+		mockedQuery.mockResolvedValueOnce([
+			{
+				id: "t1",
+				subject: "Help",
+				status: "open",
+				priority: "medium",
+				customer_id: "c1",
+				customer_name: "Alice Chen",
+			},
+		]);
 
 		const result = await client.callTool({
 			name: "list_tickets",
@@ -92,23 +85,18 @@ describe("get_ticket", () => {
 	it("returns ticket with customer info", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000001";
 
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: {
-					id: ticketId,
-					subject: "Login broken",
-					status: "open",
-					priority: "high",
-					customers: {
-						id: "c1",
-						name: "Alice",
-						email: "alice@test.com",
-						company: "Acme",
-					},
-				},
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([
+			{
+				id: ticketId,
+				subject: "Login broken",
+				status: "open",
+				priority: "high",
+				c_id: "c1",
+				c_name: "Alice",
+				c_email: "alice@test.com",
+				c_company: "Acme",
+			},
+		]);
 
 		const result = await client.callTool({
 			name: "get_ticket",
@@ -117,20 +105,15 @@ describe("get_ticket", () => {
 
 		const parsed = getToolJson(result);
 		expect(parsed.subject).toBe("Login broken");
-		expect(parsed.customer.name).toBe("Alice");
-		expect(parsed.customer.company).toBe("Acme");
-		expect(parsed.customers).toBeUndefined();
+		const customer = parsed.customer as Record<string, unknown>;
+		expect(customer.name).toBe("Alice");
+		expect(customer.company).toBe("Acme");
+		expect(parsed.c_id).toBeUndefined();
 	});
 
 	it("returns not found for missing ticket", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000999";
-
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: null,
-				error: { message: "not found" },
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "get_ticket",
@@ -147,23 +130,16 @@ describe("create_ticket", () => {
 		const customerId = "abc00000-0000-0000-0000-000000000001";
 
 		// First call: customer existence check
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: { id: customerId }, error: null }),
-		);
+		mockedSql.mockResolvedValueOnce([{ id: customerId }]);
 		// Second call: ticket insert
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: [
-					{
-						id: "t-new",
-						customer_id: customerId,
-						subject: "New issue",
-						status: "open",
-					},
-				],
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([
+			{
+				id: "t-new",
+				customer_id: customerId,
+				subject: "New issue",
+				status: "open",
+			},
+		]);
 
 		const result = await client.callTool({
 			name: "create_ticket",
@@ -188,16 +164,10 @@ describe("create_ticket", () => {
 	});
 
 	it("errors on multiple customer matches", async () => {
-		// findCustomersByName returns multiple
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: [
-					{ id: "c1", name: "Alice Chen" },
-					{ id: "c2", name: "Alice Wang" },
-				],
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([
+			{ id: "c1", name: "Alice Chen" },
+			{ id: "c2", name: "Alice Wang" },
+		]);
 
 		const result = await client.callTool({
 			name: "create_ticket",
@@ -214,19 +184,13 @@ describe("close_ticket", () => {
 	it("closes an open ticket", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000001";
 
-		// Update with .neq("status","closed") returns the updated row
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: [
-					{
-						id: ticketId,
-						status: "closed",
-						resolution: "Fixed the bug",
-					},
-				],
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([
+			{
+				id: ticketId,
+				status: "closed",
+				resolution: "Fixed the bug",
+			},
+		]);
 
 		const result = await client.callTool({
 			name: "close_ticket",
@@ -241,17 +205,10 @@ describe("close_ticket", () => {
 	it("rejects closing an already-closed ticket", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000001";
 
-		// Update returns empty (no rows matched .neq filter)
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: [], error: null }),
-		);
-		// Disambiguation read returns closed status
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: { status: "closed", closed_at: "2026-01-01" },
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([]);
+		mockedSql.mockResolvedValueOnce([
+			{ status: "closed", closed_at: "2026-01-01" },
+		]);
 
 		const result = await client.callTool({
 			name: "close_ticket",
@@ -265,14 +222,8 @@ describe("close_ticket", () => {
 	it("returns not found when ticket does not exist", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000999";
 
-		// Update returns empty
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: [], error: null }),
-		);
-		// Disambiguation read returns error (not found)
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: null, error: { message: "not found" } }),
-		);
+		mockedSql.mockResolvedValueOnce([]);
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "close_ticket",
@@ -284,35 +235,10 @@ describe("close_ticket", () => {
 	});
 });
 
-describe("get_ticket error discrimination", () => {
-	it("returns not found for PGRST116 error", async () => {
-		const ticketId = "abc00000-0000-0000-0000-000000000999";
-
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: null,
-				error: { message: "not found", code: "PGRST116" },
-			}),
-		);
-
-		const result = await client.callTool({
-			name: "get_ticket",
-			arguments: { id: ticketId },
-		});
-
-		const text = getToolText(result);
-		expect(text).toContain("not found");
-	});
-
-	it("returns database error for non-PGRST116 errors", async () => {
+describe("get_ticket error handling", () => {
+	it("returns database error on query failure", async () => {
 		const ticketId = "abc00000-0000-0000-0000-000000000001";
-
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: null,
-				error: { message: "connection timeout", code: "PGRST000" },
-			}),
-		);
+		mockedSql.mockRejectedValueOnce(new Error("connection timeout"));
 
 		const result = await client.callTool({
 			name: "get_ticket",
@@ -329,16 +255,9 @@ describe("create_ticket edge cases", () => {
 	it("handles FK violation when customer is deleted", async () => {
 		const customerId = "abc00000-0000-0000-0000-000000000001";
 
-		// Customer existence check passes
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: { id: customerId }, error: null }),
-		);
-		// Insert fails with FK violation
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: null,
-				error: { message: "violates foreign key", code: "23503" },
-			}),
+		mockedSql.mockResolvedValueOnce([{ id: customerId }]);
+		mockedSql.mockRejectedValueOnce(
+			pgError("violates foreign key", "23503"),
 		);
 
 		const result = await client.callTool({
@@ -353,14 +272,8 @@ describe("create_ticket edge cases", () => {
 	it("handles empty data array from insert", async () => {
 		const customerId = "abc00000-0000-0000-0000-000000000001";
 
-		// Customer existence check
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: { id: customerId }, error: null }),
-		);
-		// Insert returns empty array
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: [], error: null }),
-		);
+		mockedSql.mockResolvedValueOnce([{ id: customerId }]);
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await client.callTool({
 			name: "create_ticket",

@@ -5,11 +5,8 @@ import {
 	resolveOneCustomer,
 	validateCustomerExists,
 } from "../lib/customers.js";
-import { PG_FK_VIOLATION, PGRST_NOT_FOUND } from "../lib/errors.js";
-import {
-	formatTicketListItem,
-	formatTicketWithCustomer,
-} from "../lib/formatters.js";
+import { query, sql } from "../lib/db.js";
+import { hasErrorCode, PG_FK_VIOLATION } from "../lib/errors.js";
 import {
 	dbErrorResponse,
 	jsonResponse,
@@ -17,7 +14,6 @@ import {
 	notFoundResponse,
 	textResponse,
 } from "../lib/responses.js";
-import { supabase } from "../lib/supabase.js";
 import { TicketPriority, TicketStatus, uuidParam } from "../lib/validation.js";
 
 export function registerTicketTools(server: McpServer): void {
@@ -42,34 +38,42 @@ export function registerTicketTools(server: McpServer): void {
 				resolvedIds = result.customerIds;
 			}
 
-			let query = supabase
-				.from("tickets")
-				.select("*, customers(name)")
-				.order("created_at", { ascending: false });
+			try {
+				const conditions: string[] = [];
+				const values: unknown[] = [];
 
-			if (status) {
-				query = query.eq("status", status);
-			}
+				if (status) {
+					values.push(status);
+					conditions.push(`t.status = $${values.length}`);
+				}
+				if (customer_id) {
+					values.push(customer_id);
+					conditions.push(`t.customer_id = $${values.length}`);
+				} else if (resolvedIds) {
+					values.push(resolvedIds);
+					conditions.push(`t.customer_id = ANY($${values.length})`);
+				}
+				if (priority) {
+					values.push(priority);
+					conditions.push(`t.priority = $${values.length}`);
+				}
 
-			if (customer_id) {
-				query = query.eq("customer_id", customer_id);
-			} else if (resolvedIds) {
-				query = query.in("customer_id", resolvedIds);
-			}
+				const where =
+					conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+				const rows = await query(
+					`SELECT t.*, c.name AS customer_name FROM tickets t LEFT JOIN customers c ON t.customer_id = c.id ${where} ORDER BY t.created_at DESC`,
+					values,
+				);
 
-			if (priority) {
-				query = query.eq("priority", priority);
-			}
+				const results = rows.map((row) => ({
+					...row,
+					customer_name: (row.customer_name as string) ?? "Unknown Customer",
+				}));
 
-			const { data, error } = await query;
-
-			if (error) {
+				return listResponse(results, "No tickets match your filters");
+			} catch (error) {
 				return dbErrorResponse(error);
 			}
-
-			const results = (data || []).map(formatTicketListItem);
-
-			return listResponse(results, "No tickets match your filters");
 		},
 	);
 
@@ -83,33 +87,34 @@ export function registerTicketTools(server: McpServer): void {
 		async (args) => {
 			const { id } = args;
 
-			const { data, error } = await supabase
-				.from("tickets")
-				.select(
-					`
-					*,
-					customers (
-						id,
-						name,
-						email,
-						company
-					)
-				`,
-				)
-				.eq("id", id)
-				.single();
+			try {
+				const rows = await sql`
+					SELECT t.*,
+						c.id AS c_id, c.name AS c_name,
+						c.email AS c_email, c.company AS c_company
+					FROM tickets t
+					LEFT JOIN customers c ON t.customer_id = c.id
+					WHERE t.id = ${id}`;
 
-			if (error) {
-				if (error.code === PGRST_NOT_FOUND) {
+				if (rows.length === 0) {
 					return notFoundResponse("Ticket", id);
 				}
+
+				const { c_id, c_name, c_email, c_company, ...ticket } = rows[0];
+				return jsonResponse({
+					...ticket,
+					customer: c_id
+						? {
+								id: c_id,
+								name: c_name,
+								email: c_email,
+								company: c_company,
+							}
+						: null,
+				});
+			} catch (error) {
 				return dbErrorResponse(error);
 			}
-			if (!data) {
-				return notFoundResponse("Ticket", id);
-			}
-
-			return jsonResponse(formatTicketWithCustomer(data));
 		},
 	);
 
@@ -144,30 +149,25 @@ export function registerTicketTools(server: McpServer): void {
 				finalCustomerId = result.customerId;
 			}
 
-			const { data, error } = await supabase
-				.from("tickets")
-				.insert({
-					customer_id: finalCustomerId,
-					subject,
-					description: description || null,
-					priority: priority || "medium",
-				})
-				.select();
+			try {
+				const rows = await sql`
+					INSERT INTO tickets (customer_id, subject, description, priority)
+					VALUES (${finalCustomerId}, ${subject}, ${description || null}, ${priority || "medium"})
+					RETURNING *`;
 
-			if (error) {
-				if (error.code === PG_FK_VIOLATION) {
+				if (rows.length === 0) {
+					return textResponse("Ticket created but could not be retrieved");
+				}
+
+				return jsonResponse(rows[0]);
+			} catch (error) {
+				if (hasErrorCode(error, PG_FK_VIOLATION)) {
 					return textResponse(
 						"Cannot create ticket: the linked customer no longer exists",
 					);
 				}
 				return dbErrorResponse(error);
 			}
-
-			if (!data || data.length === 0) {
-				return textResponse("Ticket created but could not be retrieved");
-			}
-
-			return jsonResponse(data[0]);
 		},
 	);
 
@@ -182,46 +182,33 @@ export function registerTicketTools(server: McpServer): void {
 		async (args) => {
 			const { id, resolution } = args;
 
-			const { data, error } = await supabase
-				.from("tickets")
-				.update({
-					status: "closed",
-					closed_at: new Date().toISOString(),
-					resolution: resolution || null,
-				})
-				.eq("id", id)
-				.neq("status", "closed")
-				.select();
+			try {
+				const rows = await sql`
+					UPDATE tickets
+					SET status = 'closed', closed_at = ${new Date().toISOString()}, resolution = ${resolution || null}
+					WHERE id = ${id} AND status != 'closed'
+					RETURNING *`;
 
-			if (error) {
-				return dbErrorResponse(error);
-			}
+				if (rows.length === 0) {
+					// Check if ticket exists and is already closed
+					const check =
+						await sql`SELECT status, closed_at FROM tickets WHERE id = ${id}`;
 
-			if (!data || data.length === 0) {
-				const { data: check, error: checkError } = await supabase
-					.from("tickets")
-					.select("status, closed_at")
-					.eq("id", id)
-					.single();
-
-				if (checkError) {
-					if (checkError.code === PGRST_NOT_FOUND) {
+					if (check.length === 0) {
 						return notFoundResponse("Ticket", id);
 					}
-					return dbErrorResponse(checkError);
-				}
-				if (!check) {
+					if (check[0].status === "closed") {
+						return textResponse(
+							`Ticket ${id} is already closed (closed on ${check[0].closed_at})`,
+						);
+					}
 					return notFoundResponse("Ticket", id);
 				}
-				if (check.status === "closed") {
-					return textResponse(
-						`Ticket ${id} is already closed (closed on ${check.closed_at})`,
-					);
-				}
-				return notFoundResponse("Ticket", id);
-			}
 
-			return jsonResponse(data[0]);
+				return jsonResponse(rows[0]);
+			} catch (error) {
+				return dbErrorResponse(error);
+			}
 		},
 	);
 }

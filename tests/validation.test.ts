@@ -3,7 +3,6 @@ import {
 	CustomerStatus,
 	TicketPriority,
 	TicketStatus,
-	sanitizeFilterValue,
 	sanitizeLikeValue,
 	uuidParam,
 } from "../src/lib/validation.js";
@@ -74,28 +73,6 @@ describe("uuidParam", () => {
 		if (!result.success) {
 			expect(result.error.issues[0].message).toContain("Customer ID");
 		}
-	});
-});
-
-describe("sanitizeFilterValue", () => {
-	it("passes through normal search terms", () => {
-		expect(sanitizeFilterValue("enterprise")).toBe("enterprise");
-	});
-
-	it("strips commas to prevent filter injection", () => {
-		expect(sanitizeFilterValue("test,id.eq.secret")).toBe("testideqsecret");
-	});
-
-	it("strips parentheses", () => {
-		expect(sanitizeFilterValue("name(test)")).toBe("nametest");
-	});
-
-	it("strips periods to prevent PostgREST operator injection", () => {
-		expect(sanitizeFilterValue("id.eq.secret")).toBe("ideqsecret");
-	});
-
-	it("handles empty string", () => {
-		expect(sanitizeFilterValue("")).toBe("");
 	});
 });
 

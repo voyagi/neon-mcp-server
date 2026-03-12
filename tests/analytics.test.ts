@@ -1,18 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	createSupabaseMock,
-	getToolJson,
-	getToolText,
-	mockQuery,
-} from "./helpers/mock-supabase.js";
+import { createDbMock, getToolJson, getToolText } from "./helpers/mock-db.js";
 
-vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
+vi.mock("../src/lib/db.js", () => createDbMock());
 
-import { supabase } from "../src/lib/supabase.js";
+import { query, sql } from "../src/lib/db.js";
 import { createServer } from "../src/server.js";
 import { aggregateByCategory } from "../src/tools/analytics.js";
 
-const mockedFrom = vi.mocked(supabase.from);
+const mockedSql = vi.mocked(sql);
+const mockedQuery = vi.mocked(query);
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -33,57 +29,26 @@ beforeEach(async () => {
 
 describe("get_summary", () => {
 	it("returns aggregated dashboard stats", async () => {
-		// Batch 1: Customer counts (3 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 15 }),
-			) // active
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 4 }),
-			) // inactive
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 3 }),
-			); // lead
+		// countWhere uses query() — 3 customer + 6 ticket + 2 recent = 11 calls
+		mockedQuery
+			.mockResolvedValueOnce([{ count: 15 }]) // active customers
+			.mockResolvedValueOnce([{ count: 4 }]) // inactive customers
+			.mockResolvedValueOnce([{ count: 3 }]) // lead customers
+			.mockResolvedValueOnce([{ count: 14 }]) // open tickets
+			.mockResolvedValueOnce([{ count: 9 }]) // closed tickets
+			.mockResolvedValueOnce([{ count: 3 }]) // urgent tickets
+			.mockResolvedValueOnce([{ count: 5 }]) // high tickets
+			.mockResolvedValueOnce([{ count: 4 }]) // medium tickets
+			.mockResolvedValueOnce([{ count: 2 }]) // low tickets
+			.mockResolvedValueOnce([{ count: 2 }]) // recent customers
+			.mockResolvedValueOnce([{ count: 1 }]); // recent closed tickets
 
-		// Batch 2: Ticket counts (6 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 14 }),
-			) // open
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 9 }),
-			) // closed
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 3 }),
-			) // urgent
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 5 }),
-			) // high
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 4 }),
-			) // medium
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 2 }),
-			); // low
-
-		// Batch 3: Products + recent activity (3 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({
-					data: [
-						{ price_cents: 4900, category: "subscription" },
-						{ price_cents: 14900, category: "subscription" },
-						{ price_cents: 2900, category: "add-on" },
-					],
-					error: null,
-				}),
-			) // products
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 2 }),
-			) // recent customers
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			); // recent closed tickets
+		// fetchProductStats uses sql tagged template — 1 call
+		mockedSql.mockResolvedValueOnce([
+			{ price_cents: 4900, category: "subscription" },
+			{ price_cents: 14900, category: "subscription" },
+			{ price_cents: 2900, category: "add-on" },
+		]);
 
 		const result = await client.callTool({
 			name: "get_summary",
@@ -92,84 +57,62 @@ describe("get_summary", () => {
 
 		const parsed = getToolJson(result);
 
-		expect(parsed.customers.active).toBe(15);
-		expect(parsed.customers.inactive).toBe(4);
-		expect(parsed.customers.leads).toBe(3);
-		expect(parsed.customers.total).toBe(22);
+		const customers = parsed.customers as Record<string, unknown>;
+		expect(customers.active).toBe(15);
+		expect(customers.inactive).toBe(4);
+		expect(customers.leads).toBe(3);
+		expect(customers.total).toBe(22);
 
-		expect(parsed.tickets.open).toBe(14);
-		expect(parsed.tickets.closed).toBe(9);
-		expect(parsed.tickets.by_priority.urgent).toBe(3);
+		const tickets = parsed.tickets as Record<string, unknown>;
+		expect(tickets.open).toBe(14);
+		expect(tickets.closed).toBe(9);
+		const byPriority = tickets.by_priority as Record<string, unknown>;
+		expect(byPriority.urgent).toBe(3);
 
-		expect(parsed.products.total_value).toBe("$227.00");
-		expect(parsed.products.by_category).toHaveLength(2);
+		const products = parsed.products as Record<string, unknown>;
+		expect(products.total_value).toBe("$227.00");
+		expect(products.by_category).toHaveLength(2);
 
-		expect(parsed.recent_activity.customers_created_this_week).toBe(2);
-		expect(parsed.recent_activity.tickets_closed_this_week).toBe(1);
+		const recent = parsed.recent_activity as Record<string, unknown>;
+		expect(recent.customers_created_this_week).toBe(2);
+		expect(recent.tickets_closed_this_week).toBe(1);
 	});
 
 	it("handles query errors gracefully", async () => {
-		// Make the first query throw
-		mockedFrom.mockImplementation(() => {
-			throw new Error("Supabase unavailable");
-		});
+		mockedQuery.mockRejectedValue(new Error("database unavailable"));
+		mockedSql.mockRejectedValue(new Error("database unavailable"));
 
 		const result = await client.callTool({
 			name: "get_summary",
 			arguments: {},
 		});
 
-		const text = getToolText(result);
-		expect(text).toContain("Error fetching summary");
+		const parsed = getToolJson(result);
+		// Products section has its own try/catch so it returns fallback data
+		const products = parsed.products as Record<string, unknown>;
+		expect(products.total_value).toBe("Error loading product data");
+		// Other sections fail via Promise.allSettled
+		expect(Array.isArray(parsed.errors)).toBe(true);
+		expect((parsed.errors as string[]).length).toBeGreaterThanOrEqual(3);
 	});
 
 	it("returns partial results when products query fails", async () => {
-		// Customer counts (3 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 10 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 2 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			);
+		// countWhere uses query() — 3 customer + 6 ticket + 2 recent = 11 calls
+		mockedQuery
+			.mockResolvedValueOnce([{ count: 10 }])
+			.mockResolvedValueOnce([{ count: 2 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 5 }])
+			.mockResolvedValueOnce([{ count: 3 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 2 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 0 }]);
 
-		// Ticket counts (6 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 5 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 3 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 2 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			);
-
-		// Products query fails
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({ data: null, error: { message: "table not found" } }),
-		);
-
-		// Recent activity (2 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 0 }),
-			);
+		// Products query fails (sql tagged template)
+		mockedSql.mockRejectedValueOnce(new Error("table not found"));
 
 		const result = await client.callTool({
 			name: "get_summary",
@@ -178,69 +121,39 @@ describe("get_summary", () => {
 
 		const parsed = getToolJson(result);
 
-		// Customer and ticket counts should still work
-		expect(parsed.customers.total).toBe(13);
-		expect(parsed.tickets.total).toBe(8);
+		const customers = parsed.customers as Record<string, unknown>;
+		expect(customers.total).toBe(13);
+		const tickets = parsed.tickets as Record<string, unknown>;
+		expect(tickets.total).toBe(8);
 
 		// Products should show error fallback
-		expect(parsed.products.total_value).toBe("Error loading product data");
-		expect(parsed.products.by_category).toEqual([]);
+		const products = parsed.products as Record<string, unknown>;
+		expect(products.total_value).toBe("Error loading product data");
+		expect(products.by_category).toEqual([]);
 
-		// Recent activity should still work
-		expect(parsed.recent_activity.customers_created_this_week).toBe(1);
+		const recent = parsed.recent_activity as Record<string, unknown>;
+		expect(recent.customers_created_this_week).toBe(1);
 	});
 
 	it("returns partial data with errors array when some sections throw", async () => {
-		// Customer counts throw (3 queries that never happen)
-		// We make the first 3 mocks throw to simulate fetchCustomerCounts failing
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: { message: "customers table locked" } }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 0 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 0 }),
-			);
+		// countWhere uses query() — first customer query throws, rest succeed
+		mockedQuery
+			.mockRejectedValueOnce(new Error("customers table locked"))
+			.mockResolvedValueOnce([{ count: 0 }])
+			.mockResolvedValueOnce([{ count: 0 }])
+			// Ticket counts (6 queries)
+			.mockResolvedValueOnce([{ count: 5 }])
+			.mockResolvedValueOnce([{ count: 3 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 2 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 1 }])
+			// Recent activity (2 queries)
+			.mockResolvedValueOnce([{ count: 1 }])
+			.mockResolvedValueOnce([{ count: 0 }]);
 
-		// Ticket counts succeed (6 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 5 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 3 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 2 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			);
-
-		// Products succeed
-		mockedFrom.mockReturnValueOnce(
-			mockQuery({
-				data: [{ price_cents: 1000, category: "tools" }],
-				error: null,
-			}),
-		);
-
-		// Recent activity succeed (2 queries)
-		mockedFrom
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 1 }),
-			)
-			.mockReturnValueOnce(
-				mockQuery({ data: null, error: null, count: 0 }),
-			);
+		// Products succeed (sql tagged template)
+		mockedSql.mockResolvedValueOnce([{ price_cents: 1000, category: "tools" }]);
 
 		const result = await client.callTool({
 			name: "get_summary",
@@ -249,12 +162,14 @@ describe("get_summary", () => {
 
 		const parsed = getToolJson(result);
 
-		// Tickets, products, recent_activity should still be present
-		expect(parsed.tickets.total).toBe(8);
-		expect(parsed.products.total_value).toBe("$10.00");
-		expect(parsed.recent_activity.customers_created_this_week).toBe(1);
+		const tickets = parsed.tickets as Record<string, unknown>;
+		expect(tickets.total).toBe(8);
+		const products = parsed.products as Record<string, unknown>;
+		expect(products.total_value).toBe("$10.00");
+		const recent = parsed.recent_activity as Record<string, unknown>;
+		expect(recent.customers_created_this_week).toBe(1);
 		expect(Array.isArray(parsed.errors)).toBe(true);
-		expect(parsed.errors[0]).toContain("customers");
+		expect((parsed.errors as string[])[0]).toContain("customers");
 	});
 });
 

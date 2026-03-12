@@ -2,7 +2,7 @@
 	"name": "upwork-mcp-server",
 	"version": "1.0.0",
 	"private": true,
-	"description": "MCP server connecting Supabase database to Claude — Upwork portfolio demo",
+	"description": "MCP server connecting a Neon Postgres database to Claude — Upwork portfolio demo",
 	"type": "module",
 	"scripts": {
 		"build": "tsc",
@@ -16,7 +16,7 @@
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.12.1",
-		"@supabase/supabase-js": "^2.49.4",
+		"@neondatabase/serverless": "^1.0.2",
 		"zod": "^4.3.6"
 	},
 	"knip": {

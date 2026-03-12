@@ -1,5 +1,5 @@
 -- TechStart CRM Demo Data
--- Run this in Supabase SQL editor after creating the tables
+-- Run this in Neon SQL editor after creating the tables
 -- See README.md for full setup instructions
 
 -- Add resolution column for close_ticket notes (Phase 3)
