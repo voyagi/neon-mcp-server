@@ -4,7 +4,8 @@ dist/
 .env*.local
 *.log
 .vscode/
-.claude/settings.json
+.planning/
+.claude/
 .mcp.json
 HANDOFF*.md
 CRASH-BUFFER.md
