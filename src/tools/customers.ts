@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { PG_UNIQUE_VIOLATION, PGRST_NOT_FOUND } from "../lib/errors.js";
+import { query, sql } from "../lib/db.js";
+import { hasErrorCode, PG_UNIQUE_VIOLATION } from "../lib/errors.js";
 import {
 	dbErrorResponse,
 	jsonResponse,
@@ -8,7 +9,6 @@ import {
 	notFoundResponse,
 	textResponse,
 } from "../lib/responses.js";
-import { supabase } from "../lib/supabase.js";
 import {
 	CustomerStatus,
 	sanitizeLikeValue,
@@ -27,26 +27,30 @@ export function registerCustomerTools(server: McpServer): void {
 		async (args) => {
 			const { status, company } = args;
 
-			let query = supabase
-				.from("customers")
-				.select("*")
-				.order("name", { ascending: true });
+			try {
+				const conditions: string[] = [];
+				const values: unknown[] = [];
 
-			if (status) {
-				query = query.eq("status", status);
-			}
+				if (status) {
+					values.push(status);
+					conditions.push(`status = $${values.length}`);
+				}
+				if (company) {
+					values.push(`%${sanitizeLikeValue(company)}%`);
+					conditions.push(`company ILIKE $${values.length}`);
+				}
 
-			if (company) {
-				query = query.ilike("company", `%${sanitizeLikeValue(company)}%`);
-			}
+				const where =
+					conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+				const rows = await query(
+					`SELECT * FROM customers ${where} ORDER BY name`,
+					values,
+				);
 
-			const { data, error } = await query;
-
-			if (error) {
+				return listResponse(rows, "No customers match your filters");
+			} catch (error) {
 				return dbErrorResponse(error);
 			}
-
-			return listResponse(data || [], "No customers match your filters");
 		},
 	);
 
@@ -60,64 +64,30 @@ export function registerCustomerTools(server: McpServer): void {
 		async (args) => {
 			const { id } = args;
 
-			const { data: customer, error: customerError } = await supabase
-				.from("customers")
-				.select("*")
-				.eq("id", id)
-				.single();
+			try {
+				const customers = await sql`SELECT * FROM customers WHERE id = ${id}`;
 
-			if (customerError) {
-				if (customerError.code === PGRST_NOT_FOUND) {
+				if (customers.length === 0) {
 					return notFoundResponse("Customer", id);
 				}
-				return dbErrorResponse(customerError);
+
+				const customer = customers[0];
+
+				const [totalResult, openResult, recentTickets] = await Promise.all([
+					sql`SELECT COUNT(*)::int AS count FROM tickets WHERE customer_id = ${id}`,
+					sql`SELECT COUNT(*)::int AS count FROM tickets WHERE customer_id = ${id} AND status != 'closed'`,
+					sql`SELECT subject, status, created_at FROM tickets WHERE customer_id = ${id} ORDER BY created_at DESC LIMIT 3`,
+				]);
+
+				return jsonResponse({
+					...customer,
+					total_tickets_count: totalResult[0]?.count ?? 0,
+					open_tickets_count: openResult[0]?.count ?? 0,
+					recent_tickets: recentTickets,
+				});
+			} catch (error) {
+				return dbErrorResponse(error);
 			}
-
-			if (!customer) {
-				return notFoundResponse("Customer", id);
-			}
-
-			const [
-				{ count: totalCount, error: totalError },
-				{ count: openCount, error: openError },
-				{ data: recentTickets, error: recentError },
-			] = await Promise.all([
-				supabase
-					.from("tickets")
-					.select("id", { count: "exact", head: true })
-					.eq("customer_id", id),
-				supabase
-					.from("tickets")
-					.select("id", { count: "exact", head: true })
-					.eq("customer_id", id)
-					.neq("status", "closed"),
-				supabase
-					.from("tickets")
-					.select("subject, status, created_at")
-					.eq("customer_id", id)
-					.order("created_at", { ascending: false })
-					.limit(3),
-			]);
-
-			if (totalError || openError || recentError) {
-				const messages = [
-					totalError?.message,
-					openError?.message,
-					recentError?.message,
-				]
-					.filter(Boolean)
-					.join(", ");
-				return textResponse(
-					`Database error while fetching ticket data: ${messages}`,
-				);
-			}
-
-			return jsonResponse({
-				...customer,
-				open_tickets_count: openCount ?? 0,
-				total_tickets_count: totalCount ?? 0,
-				recent_tickets: recentTickets || [],
-			});
 		},
 	);
 
@@ -134,30 +104,25 @@ export function registerCustomerTools(server: McpServer): void {
 		async (args) => {
 			const { name, email, company, status } = args;
 
-			const { data, error } = await supabase
-				.from("customers")
-				.insert({
-					name,
-					email,
-					company: company || null,
-					status: status || "active",
-				})
-				.select();
+			try {
+				const rows = await sql`
+					INSERT INTO customers (name, email, company, status)
+					VALUES (${name}, ${email}, ${company || null}, ${status || "active"})
+					RETURNING *`;
 
-			if (error) {
-				if (error.code === PG_UNIQUE_VIOLATION) {
+				if (rows.length === 0) {
+					return textResponse("Customer created but could not be retrieved");
+				}
+
+				return jsonResponse(rows[0]);
+			} catch (error) {
+				if (hasErrorCode(error, PG_UNIQUE_VIOLATION)) {
 					return textResponse(
 						`A customer with email "${email}" already exists`,
 					);
 				}
 				return dbErrorResponse(error);
 			}
-
-			if (!data || data.length === 0) {
-				return textResponse("Customer created but could not be retrieved");
-			}
-
-			return jsonResponse(data[0]);
 		},
 	);
 
@@ -188,14 +153,23 @@ export function registerCustomerTools(server: McpServer): void {
 				return textResponse("No fields provided to update");
 			}
 
-			const { data, error } = await supabase
-				.from("customers")
-				.update(updates)
-				.eq("id", id)
-				.select();
+			const fields = Object.entries(updates);
+			const setClauses = fields.map(([key], i) => `${key} = $${i + 1}`);
+			const values = [...fields.map(([, val]) => val), id];
 
-			if (error) {
-				if (error.code === PG_UNIQUE_VIOLATION) {
+			try {
+				const rows = await query(
+					`UPDATE customers SET ${setClauses.join(", ")} WHERE id = $${fields.length + 1} RETURNING *`,
+					values,
+				);
+
+				if (rows.length === 0) {
+					return notFoundResponse("Customer", id);
+				}
+
+				return jsonResponse(rows[0]);
+			} catch (error) {
+				if (hasErrorCode(error, PG_UNIQUE_VIOLATION)) {
 					const msg = email
 						? `Email "${email}" is already taken by another customer`
 						: "A customer with that email already exists";
@@ -203,12 +177,6 @@ export function registerCustomerTools(server: McpServer): void {
 				}
 				return dbErrorResponse(error);
 			}
-
-			if (!data || data.length === 0) {
-				return notFoundResponse("Customer", id);
-			}
-
-			return jsonResponse(data[0]);
 		},
 	);
 }

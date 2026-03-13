@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseMock } from "./helpers/mock-supabase.js";
+import { createDbMock } from "./helpers/mock-db.js";
 
-vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
+vi.mock("../src/lib/db.js", () => createDbMock());
 
 import { createServer } from "../src/server.js";
 

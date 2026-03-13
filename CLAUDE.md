@@ -1,4 +1,4 @@
-# Supabase MCP Server — Upwork Portfolio Project
+# Neon MCP Server — Upwork Portfolio Project
 
 ## Purpose
 
@@ -11,7 +11,7 @@ Full Upwork strategy: `C:\Users\Eagi\Making money\side-projects\upwork-strategy.
 
 ## What to Build
 
-An **MCP server** that connects a Supabase database to Claude Desktop/Code,
+An **MCP server** that connects a Neon Postgres database to Claude Desktop/Code,
 allowing natural language queries against business data.
 
 ### Demo Scenario: "TechStart CRM"
@@ -41,14 +41,14 @@ The MCP server exposes this data so Claude can:
 
 - **Runtime**: Node.js + TypeScript
 - **MCP SDK**: @modelcontextprotocol/sdk
-- **Database**: Supabase (Postgres)
+- **Database**: Neon Postgres (@neondatabase/serverless)
 - **Validation**: Zod
 - **Linter/Formatter**: Biome
 - **Transport**: stdio (for Claude Desktop/Code integration)
 
 ## Architecture
 
-```
+```text
 src/
   index.ts              — MCP server entry point + transport setup
   server.ts             — Server definition, tool + resource registration
@@ -60,21 +60,27 @@ src/
   resources/
     schema.ts           — Expose DB schema as MCP resource
   lib/
-    supabase.ts         — Supabase client
-    types.ts            — Shared TypeScript types
+    db.ts               — Neon database client (sql tagged templates + query helper)
+    customers.ts        — Customer lookup/validation helpers
+    errors.ts           — PostgreSQL error code helpers
+    formatters.ts       — Product price formatting
+    responses.ts        — MCP tool response helpers
+    validation.ts       — Zod schemas and sanitization
 seed/
-  seed.sql              — Demo data for the CRM tables
-  setup.md              — How to set up the Supabase project
+  schema.sql            — Table definitions
+  seed.sql              — Demo data (22 customers, 32 tickets, 12 products)
+  run-seed.mjs          — Script to create tables and seed data
+  e2e-test.mjs          — E2E tests against live database
 ```
 
-## MCP Tools to Implement
+## MCP Tools
 
 ### Customers
 
 | Tool | Description |
 |------|-------------|
 | `list_customers` | List all customers, optionally filter by status or company |
-| `get_customer` | Get a single customer by ID |
+| `get_customer` | Get a single customer by ID, including ticket summary |
 | `create_customer` | Add a new customer |
 | `update_customer` | Update customer fields |
 
@@ -82,31 +88,31 @@ seed/
 
 | Tool | Description |
 |------|-------------|
-| `list_tickets` | List tickets, filter by status (open/closed) or customer |
-| `get_ticket` | Get ticket details including customer info |
+| `list_tickets` | List tickets, filter by status, priority, customer ID, or customer name |
+| `get_ticket` | Get ticket details including linked customer info |
 | `create_ticket` | Create a new support ticket |
-| `close_ticket` | Mark a ticket as resolved |
+| `close_ticket` | Mark a ticket as resolved with optional resolution note |
 
 ### Products
 
 | Tool | Description |
 |------|-------------|
 | `list_products` | List all products with pricing |
-| `search_products` | Search products by name or category |
+| `search_products` | Search products by name, category, or description |
 
 ### Analytics
 
 | Tool | Description |
 |------|-------------|
-| `get_summary` | Dashboard stats: total customers, open tickets, revenue |
+| `get_summary` | Dashboard stats: customer counts, ticket stats, product catalog value, recent activity |
 
 ## MCP Resources
 
 | Resource | URI | Description |
 |----------|-----|-------------|
-| Database schema | `schema://tables` | Lists all tables and columns |
+| Database schema | `schema://tables` | Full schema with columns, types, constraints, relationships |
 
-## Database Schema (Supabase)
+## Database Schema (Neon Postgres)
 
 ```sql
 create table customers (
@@ -144,8 +150,7 @@ create table tickets (
 
 Copy `.env.example` to `.env` and fill in:
 
-- `SUPABASE_URL` — Supabase project URL
-- `SUPABASE_SECRET_KEY` — Service role key (server-side, full access)
+- `DATABASE_URL` — Neon Postgres connection string
 
 ## Claude Desktop Integration
 
@@ -158,8 +163,7 @@ Add to `claude_desktop_config.json`:
       "command": "node",
       "args": ["C:/Users/Eagi/projects/upwork-mcp-server/dist/index.js"],
       "env": {
-        "SUPABASE_URL": "https://your-project.supabase.co",
-        "SUPABASE_SECRET_KEY": "eyJ..."
+        "DATABASE_URL": "postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
       }
     }
   }
@@ -173,12 +177,20 @@ npm run build    # Compile TypeScript
 npm run dev      # Run with tsx watch (hot reload)
 npm run start    # Run compiled version
 npm run check    # Biome check
+npm test         # Run unit tests (81 tests)
 ```
 
+## Database Setup
+
+```bash
+# Set DATABASE_URL in .env, then:
+node seed/run-seed.mjs   # Creates tables + seeds demo data
+node seed/e2e-test.mjs   # Runs 14 E2E tests against live DB
+```
 
 ## Demo Strategy
 
-1. Seed Supabase with realistic demo data (20 customers, 30 tickets, 10 products)
+1. Seed Neon with realistic demo data (22 customers, 32 tickets, 12 products)
 2. Connect to Claude Desktop
 3. Screen-record a conversation: "Show me open tickets" → "Create a ticket for..." → "Get summary stats"
 4. Show Claude understanding the data naturally

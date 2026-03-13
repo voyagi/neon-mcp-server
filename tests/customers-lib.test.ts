@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseMock, mockQuery } from "./helpers/mock-supabase.js";
+import { createDbMock } from "./helpers/mock-db.js";
 
-vi.mock("../src/lib/supabase.js", () => createSupabaseMock());
+vi.mock("../src/lib/db.js", () => createDbMock());
 
-import { supabase } from "../src/lib/supabase.js";
+import { sql } from "../src/lib/db.js";
 import {
 	findCustomersByName,
 	resolveCustomerIds,
@@ -11,7 +11,7 @@ import {
 	validateCustomerExists,
 } from "../src/lib/customers.js";
 
-const mockedFrom = vi.mocked(supabase.from);
+const mockedSql = vi.mocked(sql);
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -19,12 +19,7 @@ beforeEach(() => {
 
 describe("findCustomersByName", () => {
 	it("returns matching customers", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: [{ id: "c1", name: "Alice Chen" }],
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([{ id: "c1", name: "Alice Chen" }]);
 
 		const result = await findCustomersByName("Alice");
 		expect(result.data).toHaveLength(1);
@@ -33,7 +28,7 @@ describe("findCustomersByName", () => {
 	});
 
 	it("returns empty array when no matches", async () => {
-		mockedFrom.mockReturnValue(mockQuery({ data: [], error: null }));
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await findCustomersByName("Nobody");
 		expect(result.data).toHaveLength(0);
@@ -41,9 +36,7 @@ describe("findCustomersByName", () => {
 	});
 
 	it("returns error on database failure", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: null, error: { message: "connection lost" } }),
-		);
+		mockedSql.mockRejectedValueOnce(new Error("connection lost"));
 
 		const result = await findCustomersByName("Alice");
 		expect(result.data).toBeNull();
@@ -53,15 +46,10 @@ describe("findCustomersByName", () => {
 
 describe("resolveCustomerIds", () => {
 	it("returns customer IDs for matching names", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: [
-					{ id: "c1", name: "Alice Chen" },
-					{ id: "c2", name: "Alice Wang" },
-				],
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([
+			{ id: "c1", name: "Alice Chen" },
+			{ id: "c2", name: "Alice Wang" },
+		]);
 
 		const result = await resolveCustomerIds("Alice");
 		expect(result.ok).toBe(true);
@@ -71,16 +59,14 @@ describe("resolveCustomerIds", () => {
 	});
 
 	it("returns error response when no matches found", async () => {
-		mockedFrom.mockReturnValue(mockQuery({ data: [], error: null }));
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await resolveCustomerIds("Nobody");
 		expect(result.ok).toBe(false);
 	});
 
 	it("returns error response on database failure", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: null, error: { message: "timeout" } }),
-		);
+		mockedSql.mockRejectedValueOnce(new Error("timeout"));
 
 		const result = await resolveCustomerIds("Alice");
 		expect(result.ok).toBe(false);
@@ -92,12 +78,7 @@ describe("resolveCustomerIds", () => {
 
 describe("resolveOneCustomer", () => {
 	it("returns single customer ID when exactly one match", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: [{ id: "c1", name: "Alice Chen" }],
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([{ id: "c1", name: "Alice Chen" }]);
 
 		const result = await resolveOneCustomer("Alice");
 		expect(result.ok).toBe(true);
@@ -107,15 +88,10 @@ describe("resolveOneCustomer", () => {
 	});
 
 	it("returns error with matches when multiple found", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({
-				data: [
-					{ id: "c1", name: "Alice Chen" },
-					{ id: "c2", name: "Alice Wang" },
-				],
-				error: null,
-			}),
-		);
+		mockedSql.mockResolvedValueOnce([
+			{ id: "c1", name: "Alice Chen" },
+			{ id: "c2", name: "Alice Wang" },
+		]);
 
 		const result = await resolveOneCustomer("Alice");
 		expect(result.ok).toBe(false);
@@ -127,7 +103,7 @@ describe("resolveOneCustomer", () => {
 	});
 
 	it("returns error when no matches found", async () => {
-		mockedFrom.mockReturnValue(mockQuery({ data: [], error: null }));
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await resolveOneCustomer("Nobody");
 		expect(result.ok).toBe(false);
@@ -139,9 +115,7 @@ describe("resolveOneCustomer", () => {
 	});
 
 	it("returns error on database failure", async () => {
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: null, error: { message: "connection lost" } }),
-		);
+		mockedSql.mockRejectedValueOnce(new Error("connection lost"));
 
 		const result = await resolveOneCustomer("Alice");
 		expect(result.ok).toBe(false);
@@ -154,9 +128,7 @@ describe("resolveOneCustomer", () => {
 describe("validateCustomerExists", () => {
 	it("returns customer ID when exists", async () => {
 		const id = "abc00000-0000-0000-0000-000000000001";
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: { id }, error: null }),
-		);
+		mockedSql.mockResolvedValueOnce([{ id }]);
 
 		const result = await validateCustomerExists(id);
 		expect(result.ok).toBe(true);
@@ -167,14 +139,23 @@ describe("validateCustomerExists", () => {
 
 	it("returns not found when customer missing", async () => {
 		const id = "abc00000-0000-0000-0000-000000000999";
-		mockedFrom.mockReturnValue(
-			mockQuery({ data: null, error: { message: "not found" } }),
-		);
+		mockedSql.mockResolvedValueOnce([]);
 
 		const result = await validateCustomerExists(id);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.response.content[0].text).toContain("not found");
+		}
+	});
+
+	it("returns database error on query failure", async () => {
+		const id = "abc00000-0000-0000-0000-000000000001";
+		mockedSql.mockRejectedValueOnce(new Error("connection refused"));
+
+		const result = await validateCustomerExists(id);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.response.content[0].text).toContain("Database error");
 		}
 	});
 });

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { query, sql } from "../lib/db.js";
 import { formatPrice } from "../lib/formatters.js";
 import { jsonResponse, textResponse } from "../lib/responses.js";
-import { supabase } from "../lib/supabase.js";
 
 type CountFilter = {
 	field: string;
@@ -10,18 +10,28 @@ type CountFilter = {
 };
 
 async function countWhere(
-	table: string,
+	table: "customers" | "tickets",
 	filters: CountFilter[],
 ): Promise<number> {
-	let query = supabase.from(table).select("id", { count: "exact", head: true });
+	const conditions: string[] = [];
+	const values: unknown[] = [];
+
 	for (const { field, op, value } of filters) {
-		if (op === "eq") query = query.eq(field, value);
-		else if (op === "neq") query = query.neq(field, value);
-		else query = query.gte(field, value);
+		const paramNum = values.length + 1;
+		if (op === "eq") conditions.push(`${field} = $${paramNum}`);
+		else if (op === "neq") conditions.push(`${field} != $${paramNum}`);
+		else conditions.push(`${field} >= $${paramNum}`);
+		values.push(value);
 	}
-	const { count, error } = await query;
-	if (error) throw error;
-	return count ?? 0;
+
+	const where =
+		conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+	// Table name is a typed literal, not user input
+	const rows = await query(
+		`SELECT COUNT(*)::int AS count FROM ${table} ${where}`,
+		values,
+	);
+	return rows[0].count as number;
 }
 
 /** Aggregates product prices by category into formatted display values */
@@ -85,19 +95,22 @@ async function fetchTicketCounts() {
 }
 
 async function fetchProductStats() {
-	const { data: products, error } = await supabase
-		.from("products")
-		.select("price_cents, category");
-
-	if (error || !products) {
+	try {
+		const products = await sql`SELECT price_cents, category FROM products`;
+		const totalValue = products.reduce(
+			(sum, p) => sum + (p.price_cents as number),
+			0,
+		);
+		return {
+			total_value: formatPrice(totalValue),
+			by_category: aggregateByCategory(
+				products as { price_cents: number; category: string }[],
+			),
+		};
+	} catch (error) {
+		console.error("Failed to fetch product stats:", error);
 		return { total_value: "Error loading product data", by_category: [] };
 	}
-
-	const totalValue = products.reduce((sum, p) => sum + p.price_cents, 0);
-	return {
-		total_value: formatPrice(totalValue),
-		by_category: aggregateByCategory(products),
-	};
 }
 
 async function fetchRecentActivity(sevenDaysAgo: string) {

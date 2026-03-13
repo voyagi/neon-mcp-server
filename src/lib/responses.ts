@@ -16,8 +16,9 @@ export function textResponse(message: string): McpToolResponse {
 	};
 }
 
-export function dbErrorResponse(error: { message: string }): McpToolResponse {
-	return textResponse(`Database error: ${error.message}`);
+export function dbErrorResponse(error: unknown): McpToolResponse {
+	const message = error instanceof Error ? error.message : String(error);
+	return textResponse(`Database error: ${message}`);
 }
 
 export function notFoundResponse(entity: string, id: string): McpToolResponse {

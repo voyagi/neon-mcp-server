@@ -1,11 +1,12 @@
+import { sql } from "./db.js";
 import {
+	dbErrorResponse,
 	jsonResponse,
 	listResponse,
 	type McpToolResponse,
 	notFoundResponse,
 	textResponse,
 } from "./responses.js";
-import { supabase } from "./supabase.js";
 import { sanitizeLikeValue } from "./validation.js";
 
 // Shared customer name resolution — used by ticket tools
@@ -13,16 +14,17 @@ export async function findCustomersByName(name: string): Promise<{
 	data: { id: string; name: string }[] | null;
 	error: string | null;
 }> {
-	const { data, error } = await supabase
-		.from("customers")
-		.select("id, name")
-		.ilike("name", `%${sanitizeLikeValue(name)}%`);
-
-	if (error) {
-		return { data: null, error: error.message };
+	try {
+		const pattern = `%${sanitizeLikeValue(name)}%`;
+		const rows =
+			await sql`SELECT id, name FROM customers WHERE name ILIKE ${pattern}`;
+		return { data: rows as { id: string; name: string }[], error: null };
+	} catch (err) {
+		return {
+			data: null,
+			error: err instanceof Error ? err.message : String(err),
+		};
 	}
-
-	return { data: data || [], error: null };
 }
 
 type ResolveOk<T> = { ok: true } & T;
@@ -92,15 +94,13 @@ export async function resolveOneCustomer(
 export async function validateCustomerExists(
 	id: string,
 ): Promise<ResolveOk<{ customerId: string }> | ResolveFail> {
-	const { data, error } = await supabase
-		.from("customers")
-		.select("id")
-		.eq("id", id)
-		.single();
-
-	if (error || !data) {
-		return { ok: false, response: notFoundResponse("Customer", id) };
+	try {
+		const rows = await sql`SELECT id FROM customers WHERE id = ${id}`;
+		if (rows.length === 0) {
+			return { ok: false, response: notFoundResponse("Customer", id) };
+		}
+		return { ok: true, customerId: rows[0].id as string };
+	} catch (error) {
+		return { ok: false, response: dbErrorResponse(error) };
 	}
-
-	return { ok: true, customerId: data.id };
 }

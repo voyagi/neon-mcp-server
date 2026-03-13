@@ -34,7 +34,7 @@ describe("textResponse", () => {
 
 describe("dbErrorResponse", () => {
 	it("formats database error with message prefix", () => {
-		const result = dbErrorResponse({ message: "connection refused" });
+		const result = dbErrorResponse(new Error("connection refused"));
 		expect(result.content[0].text).toBe(
 			"Database error: connection refused",
 		);

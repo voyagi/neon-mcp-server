@@ -24,12 +24,6 @@ export function uuidParam(label: string) {
 	return z.guid({ error: `${label} must be a valid UUID` });
 }
 
-// Strip characters that are structural in PostgREST filter syntax
-// to prevent filter injection when interpolating into .or() strings
-export function sanitizeFilterValue(value: string): string {
-	return value.replace(/[,.()]/g, "");
-}
-
 // Escape LIKE/ILIKE wildcards so user input is matched literally
 export function sanitizeLikeValue(value: string): string {
 	return value.replace(/[%_\\]/g, "\\$&");

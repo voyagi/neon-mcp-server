@@ -1,5 +1,5 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { validateConnection } from "./lib/supabase.js";
+import { validateConnection } from "./lib/db.js";
 import { createServer } from "./server.js";
 
 async function main() {

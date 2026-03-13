@@ -60,4 +60,4 @@ After building, add to Claude Desktop config:
 
 - **Zod schemas**: Tool input schemas must use Zod. Convert to JSON Schema via `.describe()`.
 - **stdio transport**: MCP servers communicate over stdin/stdout. Never use `console.log` for debugging — use `console.error` instead.
-- **Supabase types**: Use the generated types from Supabase CLI or define manually in `lib/types.ts`.
+- **Neon types**: The `neon()` tagged template returns `Record<string, unknown>[]`. Cast rows when passing to typed functions.
