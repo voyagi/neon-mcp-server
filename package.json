@@ -20,6 +20,9 @@
 		"zod": "^4.3.6"
 	},
 	"knip": {
+		"entry": [
+			"seed/*.mjs"
+		],
 		"ignore": [
 			".claude/**"
 		]
