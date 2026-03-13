@@ -24,6 +24,7 @@ async function run() {
     console.log("Seeding data...");
     await client.query("BEGIN");
     try {
+      await client.query("TRUNCATE tickets, products, customers CASCADE");
       await client.query(seed);
       await client.query("COMMIT");
     } catch (err) {
