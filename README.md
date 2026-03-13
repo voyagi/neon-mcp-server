@@ -25,6 +25,8 @@ Claude communicates with the MCP server over stdio. The server translates natura
 
 ## Demo
 
+[Watch the full demo video](https://github.com/voyagi/upwork-mcp-server/releases/download/v1.0.0/techstart-crm-mcp-demo.mp4)
+
 ### Querying open tickets
 
 ![List open support tickets](docs/screenshots/01-list-tickets.png)
