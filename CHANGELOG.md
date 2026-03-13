@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/voyagi/upwork-mcp-server/compare/v1.0.0...v1.0.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* **seed:** truncate tables before seeding for idempotent re-runs ([e939b15](https://github.com/voyagi/upwork-mcp-server/commit/e939b15ead8540913bbfbed55f79cb65642106d1))
+
 ## 1.0.0 (2026-03-03)
 
 
