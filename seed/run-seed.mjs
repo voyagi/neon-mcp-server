@@ -19,10 +19,17 @@ async function run() {
     await client.query(schema);
     console.log("Tables created.");
 
-    // Run seed as one big transaction
+    // Run seed in a transaction so partial failures don't leave bad state
     const seed = readFileSync(new URL("./seed.sql", import.meta.url), "utf8");
     console.log("Seeding data...");
-    await client.query(seed);
+    await client.query("BEGIN");
+    try {
+      await client.query(seed);
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    }
     console.log("Done!");
   } finally {
     client.release();

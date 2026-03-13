@@ -147,4 +147,15 @@ describe("validateCustomerExists", () => {
 			expect(result.response.content[0].text).toContain("not found");
 		}
 	});
+
+	it("returns database error on query failure", async () => {
+		const id = "abc00000-0000-0000-0000-000000000001";
+		mockedSql.mockRejectedValueOnce(new Error("connection refused"));
+
+		const result = await validateCustomerExists(id);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.response.content[0].text).toContain("Database error");
+		}
+	});
 });

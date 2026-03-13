@@ -107,7 +107,8 @@ async function fetchProductStats() {
 				products as { price_cents: number; category: string }[],
 			),
 		};
-	} catch {
+	} catch (error) {
+		console.error("Failed to fetch product stats:", error);
 		return { total_value: "Error loading product data", by_category: [] };
 	}
 }

@@ -185,7 +185,7 @@ export function registerTicketTools(server: McpServer): void {
 			try {
 				const rows = await sql`
 					UPDATE tickets
-					SET status = 'closed', closed_at = ${new Date().toISOString()}, resolution = ${resolution || null}
+					SET status = 'closed', closed_at = NOW(), resolution = ${resolution || null}
 					WHERE id = ${id} AND status != 'closed'
 					RETURNING *`;
 

@@ -1,5 +1,6 @@
 import { sql } from "./db.js";
 import {
+	dbErrorResponse,
 	jsonResponse,
 	listResponse,
 	type McpToolResponse,
@@ -99,7 +100,7 @@ export async function validateCustomerExists(
 			return { ok: false, response: notFoundResponse("Customer", id) };
 		}
 		return { ok: true, customerId: rows[0].id as string };
-	} catch {
-		return { ok: false, response: notFoundResponse("Customer", id) };
+	} catch (error) {
+		return { ok: false, response: dbErrorResponse(error) };
 	}
 }
