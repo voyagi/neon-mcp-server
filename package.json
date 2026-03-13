@@ -1,6 +1,6 @@
 {
 	"name": "upwork-mcp-server",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"private": true,
 	"description": "MCP server connecting a Neon Postgres database to Claude — Upwork portfolio demo",
 	"type": "module",
