@@ -23,6 +23,22 @@ Claude communicates with the MCP server over stdio. The server translates natura
 
 ---
 
+## Demo
+
+### Querying open tickets
+
+![List open support tickets](docs/screenshots/01-list-tickets.png)
+
+### Creating a ticket through conversation
+
+![Create a new ticket for Sarah Chen](docs/screenshots/02-create-ticket.png)
+
+### Business summary dashboard
+
+![Business summary with customer, ticket, and product stats](docs/screenshots/03-business-summary.png)
+
+---
+
 ## Features
 
 ### Customers
