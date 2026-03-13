@@ -2,10 +2,9 @@
 
 ## Purpose
 
-Portfolio demo for an Upwork freelancing profile. Demonstrates ability to
-build custom MCP (Model Context Protocol) servers that connect business
-data to AI assistants like Claude. This is project #3 of 4 portfolio
-pieces — and the highest-value skill ($2K-15K per project on Upwork).
+Demo project showcasing custom MCP server development for business data
+integration. Demonstrates building MCP (Model Context Protocol) servers
+that connect business data to AI assistants like Claude.
 
 ## What to Build
 
@@ -28,7 +27,7 @@ The MCP server exposes this data so Claude can:
 - "Create a new ticket for John about billing"
 - "How many customers signed up this month?"
 
-### Why This Impresses Upwork Clients
+### Value Proposition
 
 - MCP is cutting-edge (most freelancers don't know it yet)
 - Shows real database integration, not toy examples
