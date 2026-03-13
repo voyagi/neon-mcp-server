@@ -7,8 +7,6 @@ build custom MCP (Model Context Protocol) servers that connect business
 data to AI assistants like Claude. This is project #3 of 4 portfolio
 pieces — and the highest-value skill ($2K-15K per project on Upwork).
 
-Full Upwork strategy: `C:\Users\Eagi\Making money\side-projects\upwork-strategy.md`
-
 ## What to Build
 
 An **MCP server** that connects a Neon Postgres database to Claude Desktop/Code,
@@ -161,7 +159,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "techstart-crm": {
       "command": "node",
-      "args": ["C:/Users/Eagi/projects/upwork-mcp-server/dist/index.js"],
+      "args": ["/absolute/path/to/upwork-mcp-server/dist/index.js"],
       "env": {
         "DATABASE_URL": "postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
       }
