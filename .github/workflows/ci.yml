@@ -7,3 +7,4 @@ jobs:
       run-build: true
       run-tests: true
       run-knip: true
+    secrets: inherit
