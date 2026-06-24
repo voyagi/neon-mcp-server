@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.2](https://github.com/voyagi/neon-mcp-server/compare/v1.0.1...v1.0.2) (2026-06-22)
+
+
+### Bug Fixes
+
+* **deps:** bump esbuild to 0.28.1 (dev-only, esbuild remainder from [#37](https://github.com/voyagi/neon-mcp-server/issues/37)) ([#39](https://github.com/voyagi/neon-mcp-server/issues/39)) ([e954203](https://github.com/voyagi/neon-mcp-server/commit/e954203ce7ac0182c17a797f5f7a6b4cf3c7a455))
+* **deps:** bump vite toolchain to clear vite HIGH ([#40](https://github.com/voyagi/neon-mcp-server/issues/40)) ([d72742b](https://github.com/voyagi/neon-mcp-server/commit/d72742b8610f230ea0401b13f7cd5f5c1a48a372))
+* **deps:** patch hono and qs moderate advisories via npm audit fix ([#37](https://github.com/voyagi/neon-mcp-server/issues/37)) ([f691b98](https://github.com/voyagi/neon-mcp-server/commit/f691b98014c596a58b009f35d951fc1067070bc8))
+
 ## [1.0.1](https://github.com/voyagi/upwork-mcp-server/compare/v1.0.0...v1.0.1) (2026-03-13)
 
 
